@@ -13,12 +13,19 @@ IDU and ODU numbers do not correspond to each other unless there is a `@` with t
 See [ODU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/Firmware/ODU) for more details.<br>
 
 ## Firmware Extraction Method
+This is still in testing.
+I plan to use the extracted firmware from a MAY 2017 SK-1000 board and flash it to a bricked MAR 2016 SK-1000 board. Hopefully the only differences between the two is the slight layout change.
+
+Extract the firmware in chunks using the `bw` command. The chunks are read from the serial output and wrote to the destination file.
+- `bw` is not shown with the `?` command. To see `bw` and its description run `d?`.
+  - Only READS from the flash; has no option to write. 
 
 Use the `odu_dump.py` python script.<br>
 
 Example:<br>
 python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin 0x00000000 0x00100000
-- This is run in the folder with the script and the output file is put into the same folder
+- This is run in the folder with the script and the output file is put into the same folder.
+- Output file is "odu_full.bin". can be changed, of course.
 - 0x00000000 0x00100000 reads the full 1MB flash off the NXP MK64FN1M0VLQ12.
   - Both the ODU versions of MAR 2016 and MAY 2017 use the NXP MK64FN1M0VLQ12.
   - The ODU board version of NOV 2012 DOES NOT use the NXP MK64FN1M0VLQ12.
