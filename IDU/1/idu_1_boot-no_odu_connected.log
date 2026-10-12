@@ -1,0 +1,20 @@
+===
+IDU Software Version - 3.00.02
+Copyright 2007 - Winegard Company
+
+EE DATA READ SUCCESSFULLY
+IDU NVS Ver: 4 Srch Mode:0 orb:0 checksum:  3
+Calculated chksum: 3 current chksum: 3
+FACTORY DEFAULT SKIPPED
+NVS: 4 checksum:  3
+ODU_POWER_ON 4665 ms
+Board_ID 3
+ODU_PWR_ON_DLY Cmp 9672 ms
+A2D Board_Id 168
+SYS_CR_SNS 6
+A2D ODU_V_MON 926
+A2D SYS_V_MON 0
+get system info -- 
+
+
+# TRUNCATED. ONLY ATTEMPT TO CONNECT TO ODU ARE MADE AFTER THESE LINES.
