@@ -13,8 +13,8 @@ IDU and ODU numbers do not correspond to each other unless there is a `@` with t
 See [ODU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/Firmware/ODU) for more details.<br>
 
 ## Firmware Extraction Method
-This is still in testing.
-I plan to use the extracted firmware from a MAY 2017 SK-1000 board and flash it to a bricked MAR 2016 SK-1000 board. Hopefully the only differences between the two is the slight layout change.
+This is still in testing.<br>
+I plan to use the extracted firmware from a MAY 2017 SK-1000 board and flash it to a bricked MAR 2016 SK-1000 board. Hopefully the only differences between the two is the slight layout change.<br>
 
 Extract the firmware in chunks using the `bw` command. The chunks are read from the serial output and wrote to the destination file.
 - `bw` is not shown with the `?` command. To see `bw` and its description run `d?`.
