@@ -27,6 +27,9 @@ python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin 0x00000000 0x00100000
 Notes:
 - I am running the script on a dismounted ODU and connected directly to the ODU debug port.
 - The ODU does get warm during the extraction, but I would say no warmer than it being in the turret on summer days (probably gets hotter).
+- In the script there are two lines labeled `LINES_PER_CMD`.
+  - Recommend/Default: The "Safe" option takes longer but makes sure that the serial buffer doesn't overflow. The script takes longer but is safer.
+  - The "Max" option is the maximum line that can be output before the serial buffer overflows.
 
 Script currently being tested with MAY 2017 board version.
 
