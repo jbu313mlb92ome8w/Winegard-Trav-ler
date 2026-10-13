@@ -17,7 +17,7 @@ This is still in testing.<br>
 I plan to use the extracted firmware from a MAY 2017 SK-1000 board and flash it to a bricked MAR 2016 SK-1000 board. Hopefully the only differences between the two is the slight layout change.<br>
 
 Use the `odu_dump.py` python script.
-- This script takes a VERY long time to run. Start it and go do something else.
+- This script takes a VERY long time to run, around 2.5 hours. Start it and go do something else.
 
 Run 'odu_dump.py -h' for usage and examples.<br>
 
