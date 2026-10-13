@@ -1,4 +1,4 @@
-import serial, sys, struct, time, os
+import serial, sys, struct, time, os, hashlib
 
 def print_help():
     help_text = """
@@ -114,6 +114,7 @@ def main():
     OUT = sys.argv[3]
     START = int(sys.argv[4], 0) if len(sys.argv) > 4 else 0x00000000
     END = int(sys.argv[5], 0) if len(sys.argv) > 5 else 0x00100000
+    t_start = time.time()
     if os.path.exists(OUT):
         file_size = os.path.getsize(OUT)
         if file_size > 0:
@@ -185,8 +186,22 @@ def main():
             eta = (1-done) * (END-START)/1024 / 0.5
             print(f"Progress: {addr:#010x}  {done:6.1%}  (ETA ~{int(eta)}s)")
             block_num += 1
+    elapsed = time.time() - t_start
+    elapsed_str = time.strftime("%H:%M:%S", time.gmtime(elapsed))
+    sha256 = hashlib.sha256()
+    md5 = hashlib.md5()
+    with open(OUT, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            sha256.update(chunk)
+            md5.update(chunk)
     print(f"\n=== COMPLETE: {block_num} blocks, {addr-START} total bytes written ===")
+    print(f"Total time: {elapsed_str} ({elapsed:.1f} seconds)")
     print(f"Final file size: {os.path.getsize(OUT)} bytes")
+    print(f"SHA256: {sha256.hexdigest()}")
+    print(f"MD5:    {md5.hexdigest()}")
     return 0
 
 sys.exit(main())
