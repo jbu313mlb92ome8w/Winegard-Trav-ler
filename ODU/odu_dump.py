@@ -4,7 +4,7 @@ def print_help():
     help_text = """
 ODU Flash Extraction Tool
 =========================
-Extracts MK64FN1M0VLQ12 flash memory contents via the ODU console 'dw' command.
+Extracts MK64FN1M0VLK12 flash memory contents via the ODU console 'dw' command.
 
 USAGE:
     python3 odu_dump.py PORT BAUD OUTPUT [START] [END] [FLAGS]
@@ -12,21 +12,25 @@ USAGE:
 PARAMETERS:
     PORT      Serial device path          (e.g. /dev/ttyUSB0)
     BAUD      Baud rate                    (e.g. 57600)
-    OUTPUT    Output binary file, or 'auto' (see AUTO FILE NAMING)
+    OUTPUT    Output binary file path, or 'auto' (see AUTO FILE NAMING)
+              Parent directories are created automatically if missing.
     START     Optional start address       (hex 0x... or decimal, default 0x0)
     END       Optional end address         (hex 0x... or decimal, default from 'id' command)
-    FLAGS     Optional flags: -a/--app-only, -h/--help
+    FLAGS     Optional flags: -a/--app-only, -v/--verbose, -h/--help
 
 AUTO FILE NAMING:
-    Passing OUTPUT as the literal string 'auto' instructs the script to
-    query the ODU 'header' command first and derive the filename from
-    its Software Version field, producing a file named like:
-        odu_v1.12.64.bin
+    Passing OUTPUT as 'auto' (with optional directory prefix) instructs
+    the script to query the ODU 'header' command first and derive the
+    filename from its Software Version field, producing a file like:
+        odu_v1.23.45.bin
     With -a/--app-only flag:
-        odu_v1.12.64_app.bin
+        odu_v1.23.45_app.bin
+    Auto naming works with directory paths:
+        dumps/auto   ->   dumps/odu_v1.23.45.bin
+        /tmp/backup/auto  ->  /tmp/backup/odu_v1.23.45.bin
     The full header and id blocks are printed before the dump begins.
-    Resume logic applies to auto-named files identically: if the file
-    already exists, it is appended from the file-size boundary.
+    Resume logic applies: if the file exists, it is appended from the
+    file-size boundary (512-byte aligned).
 
 MEMORY MAP:
     Dynamically extracted from the ODU 'id' command output. The
@@ -55,11 +59,17 @@ EXAMPLES:
     Full extraction with explicit filename:
         python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin
 
-    Resume interrupted dump (auto-detected from file size):
+    Auto naming with directory creation:
+        python3 odu_dump.py /dev/ttyUSB0 57600 dumps/auto
+
+    Explicit filename with directory:
+        python3 odu_dump.py /dev/ttyUSB0 57600 /data/odubackups/dump.bin
+
+    Resume interrupted dump (auto-detected from file size and flag):
         python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin
 
-    App-only with explicit range (overriding 'id' parsing):
-        python3 odu_dump.py /dev/ttyUSB0 57600 app.bin 0x10000 0x80500
+    Custom explicit range (overriding 'id' parsing):
+        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin 0x10000 0x10001
 
 NOTES:
     * The ODU 'header' and 'id' commands are issued at startup and
@@ -74,12 +84,14 @@ NOTES:
     * All commands are read-only ('header', 'id', and 'dw'); no flash
       write risk.
     * Interrupted runs leave a valid prefix; realigns to the
-      nearest 512-byte boundary on resume.
+      nearest 512-byte boundary on resume. Ctrl-C or serial disconnect
+      preserves partial data with summary and resume command hint.
     * SHA256 and MD5 of the completed file are printed at the end,
       along with total elapsed time, enabling cross-device comparisons.
+    * Parent directories in OUTPUT paths are created automatically.
 
-DEFAULT RANGE: Dynamically determined from 'id' command output.
-               Falls back to 0x00000000-0x00100000 if 'id' unavailable.
+DEFAULT RANGE: Full flash from 0x0 to module default 0x100000.
+               Override with explicit START END arguments.
 """
     print(help_text)
 
@@ -91,6 +103,22 @@ END = 0x100000
 LINES_PER_CMD = 32
 VERBOSE = False
 APP_ONLY = False
+
+def ensure_output_dir(path):
+    # Ensure the parent directory of 'path' exists; create if missing.
+    sep = '/' if '/' in path else '\\'
+    if sep not in path:
+        return  # No directory component in bare filename
+    idx = path.rfind(sep)
+    dirname = path[:idx] or '.'
+    if os.path.isdir(dirname):
+        return  # Exists, no action needed
+    try:
+        os.makedirs(dirname)
+        if VERBOSE:
+            print(f"Created directory: {dirname}")
+    except OSError as e:
+        raise RuntimeError(f"cannot create directory {dirname}: {e}")
 
 def send_cmd(ser, cmd):
     ser.reset_input_buffer()
@@ -343,6 +371,7 @@ def main():
     PORT = clean_args[1]
     BAUD = int(clean_args[2])
     OUT = clean_args[3]
+    ensure_output_dir(OUT)
 
     # Check for explicit START/END in clean_args after positional
     if len(clean_args) > 4:
