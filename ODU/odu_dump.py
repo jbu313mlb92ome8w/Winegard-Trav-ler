@@ -1,4 +1,4 @@
-import serial, sys, struct, time, os, hashlib, re
+import serial, sys, struct, time, os, hashlib, re, random
 
 def print_help():
     help_text = """
@@ -10,25 +10,37 @@ USAGE:
     python3 odu_dump.py PORT BAUD OUTPUT [START] [END] [FLAGS]
 
 PARAMETERS:
-    PORT      Serial device path          (e.g. /dev/ttyUSB0)
-    BAUD      Baud rate                    (e.g. 57600)
-    OUTPUT    Output binary file path, or 'auto' (see AUTO FILE NAMING)
-              Parent directories are created automatically if missing.
-    START     Optional start address       (hex 0x... or decimal, default 0x0)
-    END       Optional end address         (hex 0x... or decimal, default from 'id' command)
-    FLAGS     Optional flags: -a/--app-only, -v/--verbose, -h/--help
+    PORT      Serial device path       (e.g. /dev/ttyUSB0)
+    BAUD      Baud rate                (e.g. 57600)
+    FLAGS     See FLAGS for list.
+    OUTPUT    Output binary file path. See EXAMPLES.
+    START     Optional start address   (hex 0x... or decimal, default 0x0)
+    END       Optional end address     (hex 0x... or decimal, default from 'id' command)
+
+FLAGS:
+    -a, --app-only    Extract only the application region using addresses
+                      parsed from the 'id' command. File suffix '_app'
+                      is added when -n/--auto-name is used.
+    -n, --auto-name   Derive filename from ODU Software Version field
+                      OUTPUT must be a directory path (not a filename).
+                      Produces odu_v<version>_full.bin or _app.bin.
+    -v, --verbose     Enable full per-line terminal output (debug,
+                      per-block messages, raw response snippets).
+                      Default is quiet mode: static header/ID panels
+                      with a single-line progress bar and ETA.
+    -h, --help        Show this help message and exit
 
 AUTO FILE NAMING:
-    Passing OUTPUT as 'auto' (with optional directory prefix) instructs
+    Passing "-n" flag (with optional directory prefix) instructs
     the script to query the ODU 'header' command first and derive the
     filename from its Software Version field, producing a file like:
-        odu_v1.23.45.bin
+        odu_v1.23.45_full.bin
     With -a/--app-only flag:
         odu_v1.23.45_app.bin
     Auto naming works with directory paths:
-        dumps/auto   ->   dumps/odu_v1.23.45.bin
-        /tmp/backup/auto  ->  /tmp/backup/odu_v1.23.45.bin
-    The full header and id blocks are printed before the dump begins.
+        -n dir/     ->  dir/odu_v1.23.45_full.bin
+        -a -n dir/  ->  dir/odu_v1.23.45_app.bin
+    The full header and id blocks are printed before the extraction begins.
     Resume logic applies: if the file exists, it is appended from the
     file-size boundary (512-byte aligned).
 
@@ -39,56 +51,55 @@ MEMORY MAP:
     compatibility across firmware revisions with different partition
     boundaries.
 
-OPTIONS:
-    -a, --app-only    Extract only the application region using addresses
-                      parsed from the 'id' command. File suffix '_app'
-                      is added when OUTPUT=auto.
-    -v, --verbose     Enable full per-line terminal output (debug,
-                      per-block messages, raw response snippets).
-                      Default is quiet mode: static header/ID panels
-                      with a single-line progress bar and ETA.
-    -h, --help        Show this help message and exit
 
 EXAMPLES:
-    Full extraction with automatic filename with _full suffix (uses 'id' command):
-        python3 odu_dump.py /dev/ttyUSB0 57600 auto
+    Full extraction with (automatic filename with -n and _full suffix):
+        python3 odu_dump.py /dev/ttyUSB0 57600 -n
 
-    App-only extraction (automatic filename with _app suffix):
-        python3 odu_dump.py /dev/ttyUSB0 57600 auto -a
+    App-only extraction (automatic filename with  -n and _app suffix):
+        python3 odu_dump.py /dev/ttyUSB0 57600 -n -a
 
     Full extraction with explicit filename:
-        python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin
+        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin
 
     Auto naming with directory creation:
-        python3 odu_dump.py /dev/ttyUSB0 57600 dumps/auto
+        python3 odu_dump.py /dev/ttyUSB0 57600 -n dir/
 
     Explicit filename with directory:
-        python3 odu_dump.py /dev/ttyUSB0 57600 /data/odubackups/dump.bin
-
-    Resume interrupted dump (auto-detected from file size and flag):
-        python3 odu_dump.py /dev/ttyUSB0 57600 odu_full.bin
+        python3 odu_dump.py /dev/ttyUSB0 57600 dir/custom.bin
 
     Custom explicit range (overriding 'id' parsing):
         python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin 0x10000 0x10001
 
+    Resume interrupted extraction (auto-detected from file size and flag):
+        python3 odu_dump.py /dev/ttyUSB0 57600 -n
+        python3 odu_dump.py /dev/ttyUSB0 57600 -a -n
+        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin 0x10000 0x10001
+
 NOTES:
+    * All commands are read-only ('header', 'id', and 'dw'); no flash
+      write risk.
     * The ODU 'header' and 'id' commands are issued at startup and
       their fields are printed for reference.
+    * Parent directories in OUTPUT paths are created automatically.
     * Addresses sent to ODU use bare hex (no 0x prefix) per console
       parser requirement; the ODU silently falls back to address 0
       when given '0x...' format.
     * Device TX buffer caps at 41 lines; script uses 32 lines
       (512-byte blocks) for safe margin.
-    * Existing output file is auto-detected and appended to
-      (resume). Delete the file to start fresh.
-    * All commands are read-only ('header', 'id', and 'dw'); no flash
-      write risk.
-    * Interrupted runs leave a valid prefix; realigns to the
-      nearest 512-byte boundary on resume. Ctrl-C or serial disconnect
-      preserves partial data with summary and resume command hint.
+    * Existing output file is auto-verified before resume:
+        1) Head check (first 16 bytes match device at base)
+        2) 5 random spot checks (interior continuity)
+        3) Tail check (boundary matches flash)
+      For -a/--app-only, all checks are clamped to the application
+      region. On failure, options are 512-byte truncation repair,
+      delete-and-restart, or abort.
+    * Interrupted runs leave the file as-written (complete blocks);
+      resume-time verification gates continuation.
     * SHA256 and MD5 of the completed file are printed at the end,
       along with total elapsed time, enabling cross-device comparisons.
-    * Parent directories in OUTPUT paths are created automatically.
+    * Sub-16-byte extraction is supported via final-block trimming.
+      Custom ranges must align to 2-byte boundaries for safety.
 
 DEFAULT RANGE: Full flash from 0x0 to module default 0x100000.
                Override with explicit START END arguments.
@@ -315,6 +326,51 @@ def draw_progress(block, addr, start, end, t_start, msg=""):
     sys.stdout.write(line[:79])
     sys.stdout.flush()
 
+def spot_verify(ser, dev_addr, file_obj, file_offset, nbytes=16):
+    # Compare nbytes of device flash against a slice of the file.
+    words = fetch_flash_words(ser, dev_addr, nbytes // 4)
+    if len(words) < nbytes // 4:
+        return False
+    file_obj.seek(file_offset)
+    expected = b"".join(struct.pack("<HH", w & 0xFFFF, w >> 16) for w in words)
+    return file_obj.read(nbytes) == expected
+
+def verify_random_spots(ser, base, file_obj, file_size, id_fields, app_only):
+    # Perform 5 random spot checks inside the file, constrained to app region if -a.
+    if file_size < 32:  # Too small for meaningful checks
+        return True
+    # Determine upper bound for random offsets
+    limit = file_size
+    if app_only:
+        app_start = id_fields.get("Application Address")
+        app_size = id_fields.get("Application Size")
+        if isinstance(app_start, int) and isinstance(app_size, int):
+            app_end = app_start + app_size
+            # Clamp limit to app_end - base
+            max_valid_len = max(0, app_end - base)
+            if max_valid_len < limit:
+                limit = max_valid_len
+                print(f"    Clamping spot-check region to {limit} bytes (app boundary).")
+
+    if limit < 32:
+        return True
+
+    # Pick 5 distinct offsets, skipping very start/end (already checked)
+    safe_range = list(range(32, max(32, limit - 32)))
+    if len(safe_range) < 5:
+        return True  # Not enough room for 5 distinct mid-range spots
+
+    random.seed(int(os.urandom(8).hex(), 16))  # Salt per run for reproducibility if desired
+    offsets = sorted(random.sample(safe_range, 5))
+
+    for i, off in enumerate(offsets):
+        dev_addr = base + off
+        if not spot_verify(ser, dev_addr, file_obj, off):
+            print(f"\n*** SPOT CHECK {i+1}/5 FAILED ***")
+            print(f"    Off {off:#x} (Addr 0x{dev_addr:x}) mismatch.")
+            return False
+    return True
+
 def parse_dump(text, expect_addr, expect_bytes):
     blob = bytearray()
     got_lines = 0
@@ -358,11 +414,11 @@ def main():
     global VERBOSE
     VERBOSE = "-v" in sys.argv or "--verbose" in sys.argv
     APP_ONLY = "-a" in sys.argv or "--app-only" in sys.argv
-    FLAGS = ("-a", "--app-only", "-h", "--help", "-v", "--verbose")
+    AUTO_NAME = "-n" in sys.argv or "--auto-name" in sys.argv
+    FLAGS = ("-a", "--app-only", "-h", "--help", "-v", "--verbose", "-n", "--auto-name")
     clean_args = [a for a in sys.argv if a not in FLAGS]
-
-    # Remove flags from args list for positional parsing
-    clean_args = [a for a in sys.argv if a not in ("-a", "--app-only", "-h", "--help")]
+    if AUTO_NAME and len(clean_args) == 3:
+        clean_args.append(".")
     if len(clean_args) < 4:
         print(f"Error: missing required arguments (need PORT BAUD OUTPUT)")
         print_help()
@@ -371,7 +427,27 @@ def main():
     PORT = clean_args[1]
     BAUD = int(clean_args[2])
     OUT = clean_args[3]
-    ensure_output_dir(OUT)
+
+    # -n/--auto-name requires OUTPUT to be a directory path, not a filename
+    if AUTO_NAME:
+        # -n mode: OUTPUT is the target directory, never a filename
+        base = os.path.basename(OUT.rstrip("/"))
+        if base and "." in base:
+            print(f"ERROR: -n/--auto-name cannot be combined with a filename.")
+            print(f"       '{OUT}' looks like a file. Pass a directory path only.")
+            return 1
+        out_dir = OUT if OUT != "." else ""
+        if out_dir and not os.path.isdir(out_dir):
+            try:
+                os.makedirs(out_dir)
+                if VERBOSE:
+                    print(f"Created directory: {out_dir}")
+            except OSError as e:
+                print(f"ERROR: cannot create directory {out_dir}: {e}")
+                return 4
+    else:
+        # Normal mode: OUT is a file path; create its parent directory
+        ensure_output_dir(OUT)
 
     # Check for explicit START/END in clean_args after positional
     if len(clean_args) > 4:
@@ -462,20 +538,17 @@ def main():
         print(f"\nApp-only mode: range 0x{START:x} - 0x{END:x} ({(END-START)//1024} KB)")
 
     # Handle auto filename
-    if OUT == "auto":
+    if AUTO_NAME:
         ver = hdr.get("Software Version")
         if not ver:
-            ver = id_fields.get("App Version", "unknown")
+            ver = id_fields.get("App Version", "")
         if ver:
             safe = "".join(c for c in str(ver) if c.isalnum() or c in ".")
-            if APP_ONLY:
-                OUT = f"odu_v{safe}_app.bin"
-            else:
-                OUT = f"odu_v{safe}_full.bin"
-            print(f"\nOutput filename derived from version: {OUT}")
         else:
-            OUT = "odu_unknown.bin"
-            print(f"\nOutput filename: {OUT}")
+            safe = "unknown"
+        fname = f"odu_v{safe}_app.bin" if APP_ONLY else f"odu_v{safe}_full.bin"
+        OUT = os.path.join(OUT if OUT != "." else "", fname)
+        print(f"\nOutput filename derived from version: {OUT}")
 
     if START >= END:
         print(f"Start address 0x{START:x} >= end 0x{END:x}; nothing to do.")
@@ -485,33 +558,60 @@ def main():
 
     t_start = time.time()
 
-    # Check resume capability
+    resume_baseline = 0
+    base = START  # invocation-determined base: 0x0, app address, or explicit
+    append_mode = False
+
+    def verify_file(size):
+        # Head + 5 spots + tail against device flash; returns failure kind or None.
+        with open(OUT, "rb") as vf:
+            if not spot_verify(ser, base, vf, 0):
+                return "head", 0
+            if not verify_random_spots(ser, base, vf, size, id_fields, APP_ONLY):
+                return "spot", 0
+            tail_off = max(0, size - 16)
+            if not spot_verify(ser, base + tail_off, vf, tail_off):
+                return "tail", tail_off
+        return None, 0
+
     if os.path.exists(OUT):
         file_size = os.path.getsize(OUT)
         if file_size > 0:
-            resume_addr = file_size
-            if resume_addr % 512 != 0:
-                print(f"WARNING: File not aligned ({file_size} bytes). Truncating to {resume_addr & ~511}.")
-                resume_addr = resume_addr & ~511
-            if START == 0:
-                print(f"\n*** RESUME DETECTED ***")
-                print(f"Existing file: {OUT}")
-                print(f"Already dumped: {file_size // 1024} KB (0x{file_size:x})")
-                print(f"Resuming from address: 0x{resume_addr:x}")
-                print(f"Remaining: {(END - resume_addr) // 1024} KB")
-                START = resume_addr
+            fail_kind, fail_off = verify_file(file_size)
+            while fail_kind is not None:
+                print(f"\n*** RESUME VERIFICATION FAILED ({fail_kind} check at 0x{base + fail_off:x}) ***")
+                print(f"    File may be corrupt, from a different base/mode, or the")
+                print(f"    device contents changed since the dump was taken.")
+                choice = input("    [t] truncate to 512-byte boundary and re-verify, "
+                               "[y] delete and start fresh, [N] abort: ").strip().lower()
+                if choice == "t":
+                    trunc_to = file_size & ~511
+                    if trunc_to == 0:
+                        print(f"    File too small to truncate ({file_size} bytes); no salvage possible.")
+                        continue
+                    os.truncate(OUT, trunc_to)
+                    file_size = trunc_to
+                    print(f"    Truncated to {file_size} bytes; re-verifying...")
+                    fail_kind, fail_off = verify_file(file_size)
+                elif choice == "y":
+                    os.remove(OUT)
+                    file_size = 0
+                    fail_kind = None
+                    print(f"    File deleted; starting fresh.")
+                else:
+                    print(f"    Aborted; no changes made to {OUT}.")
+                    ser.close()
+                    return 1
+            if file_size > 0:
+                START = base + file_size
                 append_mode = True
-            elif START == resume_addr:
-                print(f"\n*** CONTINUING FROM SPECIFIED OFFSET 0x{START:x} ***")
-                append_mode = True
+                resume_baseline = file_size
+                print(f"\n*** VERIFICATION PASSED (head + 5 spots + tail) ***")
+                print(f"    Existing file: {OUT} ({file_size // 1024} KB)")
+                print(f"    Resuming from: 0x{START:x}")
+                print(f"    Remaining:     {(max(0, END - START)) // 1024} KB")
             else:
-                print(f"\n*** WARNING: File exists but START={START:#x} differs from file size={file_size} ***")
-                print(f"Either specify START=0 to auto-resume, or delete {OUT} to start fresh.")
-                return 1
-        else:
-            append_mode = False
-    else:
-        append_mode = False
+                append_mode = False
 
     with open(OUT, "ab" if append_mode else "wb") as out:
         addr = START
@@ -520,8 +620,9 @@ def main():
         exit_code = None
         try:
             while addr < END:
-                n = min(LINES_PER_CMD, (END - addr + 15) // 16)
-                cmd = f"dw {addr:x} {n}"
+                n_lines = min(LINES_PER_CMD, (END - addr + 15) // 16)
+                remaining = END - addr
+                cmd = f"dw {addr:x} {n_lines}"
                 if VERBOSE:
                     print(f"\n=== Block {block_num}: {addr:#010x} for {n*16} bytes ===")
                 for attempt in range(3):
@@ -532,7 +633,9 @@ def main():
                         text = read_until_prompt(ser)
                         if VERBOSE:
                             print(f"Raw response snippet:\n{text[:500]}...")
-                        blob = parse_dump(text, addr, n * 16)
+                        blob = parse_dump(text, addr, n_lines * 16)
+                        if remaining < len(blob):
+                            blob = blob[:remaining]
                         break
                     except ValueError as e:
                         msg = f"retry {attempt+1}: {str(e)[:20]}"
@@ -546,7 +649,7 @@ def main():
                     return 1
                 out.write(blob)
                 out.flush()
-                addr += n * 16
+                addr += n_lines * 16
                 block_num += 1
                 if VERBOSE:
                     print(f"BLOCK OK: wrote {len(blob)} bytes to {OUT}")
@@ -569,30 +672,24 @@ def main():
 
     if interrupted:
         try:
-            size = os.path.getsize(OUT)
-        except OSError:
-            size = 0
-        if size % 512 != 0:
-            try:
-                os.truncate(OUT, size & ~511)
-                size = size & ~511
-                print(f"\nTrimmed torn final block; file realigned to {size} bytes.")
-            except OSError:
-                pass
-        try:
             ser.close()
         except (serial.SerialException, OSError):
             pass
+        try:
+            size = os.path.getsize(OUT)
+        except OSError:
+            size = 0
+        session_saved = size - resume_baseline
         print(f"\n{'='*60}")
         print(f"EXTRACTION ABORTED: {exit_reason}")
         print(f"{'='*60}")
         print(f"Partial file:    {OUT}")
-        print(f"Bytes saved:     {size} ({size // 1024} KB)")
+        print(f"Session bytes:   {session_saved} ({session_saved // 1024} KB)")
+        print(f"Total in file:  {size} ({size // 1024} KB)")
         if size:
-            print(f"Stopped at:      0x{START + size:x}")
+            print(f"Stopped at:      0x{START + session_saved:x}")
         print(f"Blocks written: {block_num}")
-        print(f"Resume with:    python3 odu_dump.py {PORT} {BAUD} {OUT} "
-              f"{hex(START)} {hex(END)}")
+        print(f"Resume with:    python3 odu_dump.py {PORT} {BAUD} {OUT}")
         print(f"{'='*60}")
         return exit_code
 
