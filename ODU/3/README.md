@@ -38,7 +38,7 @@ Application Address:    10000<br>
 Application Size:     7FFFFFF<br>
 NVS Address:                0<br>
 NVS Size:                   0<br>
-<br>
+
 #### STATS>`r`<br>
  Power Ups:267<br>
  Searches: 106<br>
