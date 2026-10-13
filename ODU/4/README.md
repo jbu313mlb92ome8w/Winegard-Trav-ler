@@ -39,3 +39,10 @@ Application Size:     7FFFFFF<br>
 NVS Address:                0<br>
 NVS Size:                   0<br>
 <br>
+STATS>`r`<br>
+ Power Ups:119<br>
+ Searches: 61<br>
+ Sweeps:   1892<br>
+ Stows:    54<br>
+ Homes:    62<br>
+<br>
