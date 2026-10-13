@@ -431,7 +431,10 @@ def main():
     # -n/--auto-name requires OUTPUT to be a directory path, not a filename
     if AUTO_NAME:
         # -n mode: OUTPUT is the target directory, never a filename
-        base = os.path.basename(OUT.rstrip("/"))
+        if OUT != ".":
+            base = os.path.basename(OUT.rstrip("/"))
+        else:
+            base = ""
         if base and "." in base:
             print(f"ERROR: -n/--auto-name cannot be combined with a filename.")
             print(f"       '{OUT}' looks like a file. Pass a directory path only.")
