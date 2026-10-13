@@ -46,7 +46,7 @@ OPTIONS:
     -h, --help        Show this help message and exit
 
 EXAMPLES:
-    Full extraction with automatic filename (uses 'id' command):
+    Full extraction with automatic filename with _full suffix (uses 'id' command):
         python3 odu_dump.py /dev/ttyUSB0 57600 auto
 
     App-only extraction (automatic filename with _app suffix):
@@ -442,7 +442,7 @@ def main():
             if APP_ONLY:
                 OUT = f"odu_v{safe}_app.bin"
             else:
-                OUT = f"odu_v{safe}.bin"
+                OUT = f"odu_v{safe}_full.bin"
             print(f"\nOutput filename derived from version: {OUT}")
         else:
             OUT = "odu_unknown.bin"
