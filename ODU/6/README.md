@@ -12,3 +12,9 @@ Software Version: 1.12.64<br>
 App vector address: 10100<br>
 Checksum: 804F4A4B<br>
 <br>
+ODU>`id`<br>
+
+<br>
+STATS>`r`<br>
+
+<br>
