@@ -1,14 +1,14 @@
 ODU>`header`
 <br>
-Header Signature: ADBCCBDA
-Header Version: 01
-Hard Plat: TRAVELER 
-Product ID: DTV_DISH 
-Rev: 5 
-Device: K64 
-ROM: ROM_1M 
-RAM: RAM_256k 
-Pin Count: PIN_144 
-Software Version: 1.12.64
-App vector address: 10100
-Checksum: 804F4A4B
+Header Signature: ADBCCBDA<br>
+Header Version: 01<br>
+Hard Plat: TRAVELER<br>
+Product ID: DTV_DISH<br>
+Rev: 5<br>
+Device: K64<br>
+ROM: ROM_1M<br>
+RAM: RAM_256k<br>
+Pin Count: PIN_144<br>
+Software Version: 1.12.64<br>
+App vector address: 10100<br>
+Checksum: 804F4A4B<br>
