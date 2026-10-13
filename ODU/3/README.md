@@ -11,7 +11,7 @@ Pin Count: PIN_144<br>
 Software Version: 1.12.68<br>
 App vector address: 10100<br>
 Checksum: 4DBC9492<br>
-<br>
+
 #### ODU>`id`<br>
 System ID:   SAM<br>
 Board ID:    Tracker<br>
