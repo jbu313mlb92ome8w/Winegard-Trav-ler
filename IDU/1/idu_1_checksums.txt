@@ -1,0 +1,4 @@
+# SHA256
+0e07bfa23b012ba5d7e02528dd9f006ec5f5cb3f52fc7eaa19e409229c2d4bfe  idu_1_v3.00.02_pf.bin
+# MD5
+44e0134d61918a7e7ab2dfcfd5925698  idu_1_v3.00.02_pf.bin
