@@ -49,11 +49,6 @@ DEFAULT RANGE: 0x00000000 - 0x00100000 (full 1 MB MK64 flash)
 """
     print(help_text)
 
-PORT = sys.argv[1]
-BAUD = int(sys.argv[2])
-OUT = sys.argv[3]
-START = int(sys.argv[4], 0) if len(sys.argv) > 4 else 0x00000000
-END = int(sys.argv[5], 0) if len(sys.argv) > 5 else 0x00100000
 LINES_PER_CMD = 32
 VERBOSE = True
 
@@ -114,6 +109,11 @@ def main():
         print(f"Error: missing required arguments (need PORT BAUD OUTPUT)")
         print_help()
         return 1
+    PORT = sys.argv[1]
+    BAUD = int(sys.argv[2])
+    OUT = sys.argv[3]
+    START = int(sys.argv[4], 0) if len(sys.argv) > 4 else 0x00000000
+    END = int(sys.argv[5], 0) if len(sys.argv) > 5 else 0x00100000
     if os.path.exists(OUT):
         file_size = os.path.getsize(OUT)
         if file_size > 0:
