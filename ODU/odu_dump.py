@@ -10,7 +10,7 @@ USAGE:
     python3 odu_dump.py PORT BAUD OUTPUT [START] [END]
 
 PARAMETERS:
-    PORT      Serial device path          (e.g. /dev/ttyUSB2)
+    PORT      Serial device path          (e.g. /dev/ttyUSB0)
     BAUD      Baud rate                    (e.g. 57600)
     OUTPUT    Output binary file           (e.g. odu_full.bin)
     START     Optional start address       (hex 0x... or decimal, default 0x0)
