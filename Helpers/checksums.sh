@@ -78,17 +78,6 @@ output_name_for() {
 }
 
 # -------------------------------------------------------------- #
-# @sec_consolidated_name
-# Builds consolidated checksum file names for parent directories.
-# -------------------------------------------------------------- #
-consolidated_name_for() {
-    local abs parent
-    abs="$(cd "$1" && pwd)"
-    parent="$(basename "$abs")"
-    printf '%s_checksums.txt' "$parent"
-}
-
-# -------------------------------------------------------------- #
 # @sec_generate
 # Writes the per-directory checksum file into the target.
 # -------------------------------------------------------------- #
@@ -107,22 +96,62 @@ generate_for_dir() {
     (
         cd "$dir"
         printf '# SHA256\n'
-        sha256sum -- *.bin
+        sha256sum -- *.bin | sort_bin_lines
         printf '# MD5\n'
-        md5sum -- *.bin
+        md5sum -- *.bin | sort_bin_lines
     ) > "$out"
     echo "wrote: $out (${#bins[@]} .bin files)"
 }
 
 # -------------------------------------------------------------- #
+# @sec_consolidated_name
+# Builds consolidated checksum file names for parent directories.
+# -------------------------------------------------------------- #
+consolidated_name_for() {
+    local abs parent
+    abs="$(cd "$1" && pwd)"
+    parent="$(basename "$abs")"
+    printf '%s_checksums.txt' "$parent"
+}
+
+# -------------------------------------------------------------- #
+# @sec_sort_lines
+# Sorts checksum lines from stdin: names matching the canonical
+# format (unit_N_vX.Y.Z_suffix.bin) sort first, ordered by the
+# token after the last underscore; non-conforming names follow.
+# The original "hash  filename" line is preserved verbatim.
+# -------------------------------------------------------------- #
+sort_bin_lines() {
+    awk '
+        {
+            hash = $1
+            $1 = ""
+            sub(/^ +/, "")
+            n = split($0, p, "/")
+            base = p[n]
+            key = "1|zz|"
+            if (base ~ /^[A-Za-z0-9-]+_[0-9]+_v[0-9]+\.[0-9]+\.[0-9]+_[a-z0-9-]+\.bin$/) {
+                tail = base
+                sub(/^.*_/, "", tail)
+                sub(/\.bin$/, "", tail)
+                key = "0|" tail "|"
+            }
+            print key hash "  " $0
+        }
+    ' | LC_ALL=C sort -t'|' -k1,1 -k2,2 | cut -d'|' -f3-
+}
+
+# -------------------------------------------------------------- #
 # @sec_write_consolidated
-# Collects all .bin files from target dirs and writes one checksum
-# file in the parent directory.
+# Collects all .bin files from target subdirs and writes one
+# checksum file in the parent directory. Each hash-type section
+# is collected whole, then sorted once per @sec_sort_lines.
+# Subdirectories with no .bin files are skipped silently.
 # -------------------------------------------------------------- #
 write_consolidated_for() {
     local parent="$1"
     local out="$parent/$(consolidated_name_for "$parent")"
-    local tmp reply bins dir
+    local tmp reply sub rel bins block
     tmp="$(mktemp)"
     trap 'rm -f "$tmp"' EXIT
 
@@ -132,19 +161,26 @@ write_consolidated_for() {
     fi
 
     printf '# SHA256\n' > "$tmp"
-    for dir in "$parent"/*/; do
-        [[ -d $dir ]] || continue
-        bins=( "$dir"*.bin )
+    block=""
+    for sub in "$parent"/*/; do
+        [[ -d $sub ]] || continue
+        bins=( "$sub"*.bin )
         [[ -e ${bins[0]} ]] || continue
-        ( cd "$dir" && sha256sum -- *.bin ) >> "$tmp"
+        rel="${sub#"$parent"/}"
+        block+="$( cd "$parent" && sha256sum -- "$rel"*.bin )"$'\n'
     done
+    printf '%s' "$block" | sort_bin_lines >> "$tmp"
+
     printf '# MD5\n' >> "$tmp"
-    for dir in "$parent"/*/; do
-        [[ -d $dir ]] || continue
-        bins=( "$dir"*.bin )
+    block=""
+    for sub in "$parent"/*/; do
+        [[ -d $sub ]] || continue
+        bins=( "$sub"*.bin )
         [[ -e ${bins[0]} ]] || continue
-        ( cd "$dir" && md5sum -- *.bin ) >> "$tmp"
+        rel="${sub#"$parent"/}"
+        block+="$( cd "$parent" && md5sum -- "$rel"*.bin )"$'\n'
     done
+    printf '%s' "$block" | sort_bin_lines >> "$tmp"
 
     mv "$tmp" "$out"
     trap - EXIT
