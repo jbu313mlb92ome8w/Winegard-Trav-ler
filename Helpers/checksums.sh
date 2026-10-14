@@ -14,7 +14,7 @@ set -euo pipefail
 # -------------------------------------------------------------- #
 usage() {
     cat <<'EOF'
-Usage: checksums.sh [-y] [target ...]
+Usage: checksums.sh [-y] [-o] [target ...]
 
 Targets:
   (none)    Recursively process every subdirectory of the current
@@ -25,14 +25,18 @@ Targets:
 
 Options:
   -y        Overwrite existing checksum files without prompting.
+  -o        Consolidate all checksums into a single file in the
+            parent directory instead of writing per-subdir files.
   -h        Show this help.
 
-Naming: the last two path components of each processed directory
-joined by underscores, plus "_checksums.txt".
+Per-directory naming:
   odu/6  -> odu/6/odu_6_checksums.txt
   idu/10 -> idu/10/idu_10_checksums.txt
 
-Directories containing no .bin files are silently ignored.
+Consolidated naming (with -o):
+  For targets idu odu: creates odu_checksums.txt in odu/
+                       and idu_checksums.txt in idu/
+  For target idu/10:   creates idu_10_checksums.txt in idu/
 EOF
 }
 
@@ -40,6 +44,7 @@ EOF
 # @sec_globals
 # -------------------------------------------------------------- #
 ASSUME_YES=0
+OUTPUT_CONSOLIDATED=0
 TARGETS=()
 
 # -------------------------------------------------------------- #
@@ -48,6 +53,7 @@ TARGETS=()
 while (( $# )); do
     case "$1" in
         -y|--yes) ASSUME_YES=1 ;;
+        -o|--consolidated) OUTPUT_CONSOLIDATED=1 ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "error: unknown option: $1" >&2; usage >&2; exit 1 ;;
         *) TARGETS+=("$1") ;;
@@ -72,8 +78,19 @@ output_name_for() {
 }
 
 # -------------------------------------------------------------- #
+# @sec_consolidated_name
+# Builds consolidated checksum file names for parent directories.
+# -------------------------------------------------------------- #
+consolidated_name_for() {
+    local abs parent
+    abs="$(cd "$1" && pwd)"
+    parent="$(basename "$abs")"
+    printf '%s_checksums.txt' "$parent"
+}
+
+# -------------------------------------------------------------- #
 # @sec_generate
-# Writes the checksum file into the directory being processed.
+# Writes the per-directory checksum file into the target.
 # -------------------------------------------------------------- #
 generate_for_dir() {
     local dir="$1" bins name out reply
@@ -98,25 +115,76 @@ generate_for_dir() {
 }
 
 # -------------------------------------------------------------- #
+# @sec_write_consolidated
+# Collects all .bin files from target dirs and writes one checksum
+# file in the parent directory.
+# -------------------------------------------------------------- #
+write_consolidated_for() {
+    local parent="$1"
+    local out="$parent/$(consolidated_name_for "$parent")"
+    local tmp reply bins dir
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT
+
+    if [[ -e $out && $ASSUME_YES -eq 0 ]]; then
+        read -rp "overwrite existing $out? [y/N] " reply
+        [[ $reply == [yY]* ]] || { echo "skip (kept existing): $out"; rm -f "$tmp"; trap - EXIT; return 0; }
+    fi
+
+    printf '# SHA256\n' > "$tmp"
+    for dir in "$parent"/*/; do
+        [[ -d $dir ]] || continue
+        bins=( "$dir"*.bin )
+        [[ -e ${bins[0]} ]] || continue
+        ( cd "$dir" && sha256sum -- *.bin ) >> "$tmp"
+    done
+    printf '# MD5\n' >> "$tmp"
+    for dir in "$parent"/*/; do
+        [[ -d $dir ]] || continue
+        bins=( "$dir"*.bin )
+        [[ -e ${bins[0]} ]] || continue
+        ( cd "$dir" && md5sum -- *.bin ) >> "$tmp"
+    done
+
+    mv "$tmp" "$out"
+    trap - EXIT
+    echo "wrote consolidated: $out"
+}
+
+# -------------------------------------------------------------- #
 # @sec_dispatch
 # -------------------------------------------------------------- #
 dispatch() {
-    local t sub
+    local t sub explicit parent
     if (( ${#TARGETS[@]} == 0 )); then
-        while IFS= read -r sub; do
-            generate_for_dir "${sub#./}"
-        done < <(find . -mindepth 1 -type d | sort)
+        if (( OUTPUT_CONSOLIDATED )); then
+            while IFS= read -r parent; do
+                [[ -d $parent ]] || continue
+                write_consolidated_for "${parent#./}"
+            done < <(find . -mindepth 1 -maxdepth 1 -type d | sort)
+        else
+            while IFS= read -r sub; do
+                generate_for_dir "${sub#./}"
+            done < <(find . -mindepth 1 -type d | sort)
+        fi
         return 0
     fi
     for t in "${TARGETS[@]}"; do
         t="${t#./}"
+        explicit=0
+        if [[ $t == */ ]]; then
+            explicit=1
+            t="${t%/}"
+        fi
         t="${t%/}"
         if [[ ! -d $t ]]; then
             echo "error: not a directory: $t" >&2
             continue
         fi
-        if [[ $t == */* ]]; then
+        if (( explicit )) || [[ $t == */* ]]; then
             generate_for_dir "$t"
+        elif (( OUTPUT_CONSOLIDATED )); then
+            write_consolidated_for "$t"
         else
             for sub in "$t"/*/; do
                 [[ -d $sub ]] || continue
@@ -127,3 +195,5 @@ dispatch() {
 }
 
 dispatch
+
+echo Complete
