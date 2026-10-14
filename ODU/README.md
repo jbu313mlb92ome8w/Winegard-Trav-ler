@@ -11,7 +11,7 @@ The .bin files are labeled as follows:<br>
 
 IDU and ODU numbers do not correspond to each other unless there is a `@` with the numbers.<br>
 
-See [ODU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/ODU) for more details.<br>
+See [ODU Wiki](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/ODU) for more details.<br>
 
 ## Firmware Extraction Method
 This is still in testing.<br>
