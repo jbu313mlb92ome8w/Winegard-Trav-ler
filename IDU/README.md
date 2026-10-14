@@ -7,4 +7,4 @@ The bin files are labeled as follows:<br>
 
 IDU and ODU numbers do not correspond to each other unless there is a `@` with the numbers.<br>
 
-See [IDU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/IDU) for more details.<br>
+See [IDU Wiki](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/IDU) for more details.<br>
