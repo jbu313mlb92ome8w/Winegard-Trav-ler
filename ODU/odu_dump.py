@@ -4,7 +4,7 @@ def print_help():
     help_text = """
 ODU Flash Extraction Tool
 =========================
-Extracts MK64FN1M0VLK12 flash memory contents via the ODU console 'dw' command.
+Extracts flash memory contents via the ODU console 'dw' command.
 
 USAGE:
     python3 odu_dump.py PORT BAUD OUTPUT [START] [END] [FLAGS]
@@ -18,6 +18,16 @@ PARAMETERS:
     END       Optional end address     (hex 0x... or decimal, default from 'id' command)
 
 FLAGS:
+    -v1               Target board variant 1: no 'header' command, TRK>
+                      prompt, flash at non-zero base (e.g. OKI 512K at
+                      0xC8000000). Range defaults to the 'id' flash
+                      region; app magic 0xFACEC0DE is verified.
+                      MCU is OKI L67Q5003A-NNN. Device TX buffer caps at
+                      102 lines.
+    -v3               Target board variant 3: 'header' command present,
+                      ODU> prompt, flash at 0x0, ADBCCBDA app magic.
+                      MCU is NXP MK64FN1M0VLK12. Device TX buffer caps at
+                      40 lines.
     -a, --app-only    Extract only the application region using addresses
                       parsed from the 'id' command. File suffix '_app'
                       is added when -n/--auto-name is used.
@@ -85,8 +95,6 @@ NOTES:
     * Addresses sent to ODU use bare hex (no 0x prefix) per console
       parser requirement; the ODU silently falls back to address 0
       when given '0x...' format.
-    * Device TX buffer caps at 41 lines; script uses 32 lines
-      (512-byte blocks) for safe margin.
     * Existing output file is auto-verified before resume:
         1) Head check (first 16 bytes match device at base)
         2) 5 random spot checks (interior continuity)
@@ -111,9 +119,11 @@ BAUD = None
 OUT = None
 START = 0x0
 END = 0x100000
-LINES_PER_CMD = 32
+LINES_PER_CMD = 40
 VERBOSE = False
 APP_ONLY = False
+PROMPT = b"ODU>"      # console prompt, set by -v1/-v3
+HAS_HEADER = True     # -v1 boards lack the 'header' command
 
 def ensure_output_dir(path):
     # Ensure the parent directory of 'path' exists; create if missing.
@@ -145,7 +155,7 @@ def read_until_prompt(ser, timeout=4.0):
         chunk = ser.read(4096)
         if chunk:
             buf += chunk
-        if buf.endswith(b"ODU>") or buf.rstrip().endswith(b"ODU>"):
+        if buf.endswith(PROMPT) or buf.rstrip().endswith(PROMPT):
             break
         if not chunk:
             time.sleep(0.02)
@@ -161,7 +171,7 @@ def fetch_header(ser):
         chunk = ser.read(4096)
         if chunk:
             buf += chunk
-        if buf.rstrip().endswith(b"ODU>"):
+        if buf.rstrip().endswith(PROMPT):
             break
         if not chunk:
             time.sleep(0.02)
@@ -175,7 +185,7 @@ def fetch_header(ser):
 
 MEM_KEYS = ("Flash Base Address", "Flash Size", "Bootloader Address",
             "Bootloader Size", "Application Address", "Application Size",
-            "NVS Address", "NVS Size")
+            "NVV Address", "NVV Size", "NVS Address", "NVS Size")
 
 def fetch_id(ser):
     ser.reset_input_buffer()
@@ -187,7 +197,7 @@ def fetch_id(ser):
         chunk = ser.read(4096)
         if chunk:
             buf += chunk
-        if buf.rstrip().endswith(b"ODU>"):
+        if buf.rstrip().endswith(PROMPT):
             break
         if not chunk:
             time.sleep(0.02)
@@ -223,14 +233,14 @@ def fetch_flash_words(ser, addr, count=1):
         chunk = ser.read(4096)
         if chunk:
             buf += chunk
-        if buf.rstrip().endswith(b"ODU>"):
+        if buf.rstrip().endswith(PROMPT):
             break
         if not chunk:
             time.sleep(0.02)
     halves = []
     for line in buf.decode("ascii", "replace").splitlines():
         line = line.strip()
-        if line and line[0].isdigit() and ":" in line:
+        if is_data_line(line):
             fields = line.partition(":")[2].split()
             if len(fields) == 8:
                 halves += [int(f, 16) for f in fields]
@@ -257,6 +267,13 @@ def parse_hex_field(val):
         except ValueError:
             return None
     return None
+
+def is_data_line(line):
+    # True when line begins with a hex address and a colon.
+    head, sep, _ = line.partition(":")
+    if sep != ":" or not head:
+        return False
+    return all(c in "0123456789abcdefABCDEF" for c in head.strip())
 
 def derive_struct_length(ser, app_base, hdr, flash_size=0x100000):
     # Anchor-and-corroborate: locate the reported checksum word in the
@@ -376,7 +393,7 @@ def parse_dump(text, expect_addr, expect_bytes):
     got_lines = 0
     for line in text.splitlines():
         line = line.strip()
-        if not line or not line[0].isdigit():
+        if not is_data_line(line):
             continue
         head, _, payload = line.partition(":")
         if _ != ":":
@@ -401,7 +418,7 @@ def parse_dump(text, expect_addr, expect_bytes):
     return bytes(blob)
 
 def main():
-    global PORT, BAUD, OUT, START, END, APP_ONLY
+    global PORT, BAUD, OUT, START, END, APP_ONLY, PROMPT, HAS_HEADER, LINES_PER_CMD
 
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print_help()
@@ -412,10 +429,30 @@ def main():
         return 1
 
     global VERBOSE
-    VERBOSE = "-v" in sys.argv or "--verbose" in sys.argv
+    V1 = "-v1" in sys.argv
+    V3 = "-v3" in sys.argv
     APP_ONLY = "-a" in sys.argv or "--app-only" in sys.argv
     AUTO_NAME = "-n" in sys.argv or "--auto-name" in sys.argv
-    FLAGS = ("-a", "--app-only", "-h", "--help", "-v", "--verbose", "-n", "--auto-name")
+    VERBOSE = "-v" in sys.argv or "--verbose" in sys.argv
+    FLAGS = ("-a", "--app-only", "-h", "--help", "-v", "--verbose",
+             "-n", "--auto-name", "-v1", "-v3")
+    if V1 and V3:
+        print("ERROR: -v1 and -v3 are mutually exclusive.")
+        return 1
+    if not V1 and not V3:
+        print("ERROR: one of -v1 or -v3 is required.")
+        print("       -v1: ODU without 'header' command (TRK> prompt)")
+        print("       -v3: ODU with 'header' command (ODU> prompt)")
+        return 1
+    if V1:
+        PROMPT = b"TRK>"
+        HAS_HEADER = False
+        LINES_PER_CMD = 102
+    else:
+        PROMPT = b"ODU>"
+        HAS_HEADER = True
+        LINES_PER_CMD = 40
+
     clean_args = [a for a in sys.argv if a not in FLAGS]
     if AUTO_NAME and len(clean_args) == 3:
         clean_args.append(".")
@@ -468,7 +505,11 @@ def main():
         return 130
 
     # Fetch and print header
-    hdr, hdr_text = fetch_header(ser)
+    if HAS_HEADER:
+        hdr, hdr_text = fetch_header(ser)
+    else:
+        hdr, hdr_text = {}, ""
+        print("\n(-v1: 'header' command not available; using 'id' only)")
     id_fields, id_text = fetch_id(ser)
 
     sig_val = hdr.get("Header Signature")
@@ -526,6 +567,27 @@ def main():
                         id_ok = True
         else:
             id_ok = True
+
+    # -v1 app headers carry 0xFACEC0DE at application base + 0x04.
+    if V1 and id_ok:
+        ab = id_fields.get("Application Address")
+        if isinstance(ab, int):
+            probe = fetch_flash_words(ser, ab, 2)
+            if len(probe) >= 2 and probe[1] == 0xFACEC0DE:
+                print(f"    App header magic 0xFACEC0DE verified at 0x{ab + 4:x}.")
+            else:
+                got = f"0x{probe[1]:08X}" if len(probe) >= 2 else "no data"
+                print(f"*** WARNING: -v1 app magic not found at 0x{ab + 4:x} (read {got}). ***")
+
+    # -v1 maps flash at a non-zero base; default range follows 'id'.
+    explicit_range = len(clean_args) > 4
+    if V1 and not APP_ONLY and not explicit_range:
+        fb = id_fields.get("Flash Base Address")
+        fs = id_fields.get("Flash Size")
+        if isinstance(fb, int) and isinstance(fs, int):
+            START = fb
+            END = fb + fs
+            print(f"\nDefault range from 'id': 0x{START:x} - 0x{END:x} ({(END-START)//1024} KB)")
 
     # Determine START/END from 'id' command if not overridden by -a or explicit args
     if APP_ONLY:
