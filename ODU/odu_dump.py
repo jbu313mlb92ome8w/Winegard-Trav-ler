@@ -64,27 +64,27 @@ MEMORY MAP:
 
 EXAMPLES:
     Full extraction with (automatic filename with -n and _full suffix):
-        python3 odu_dump.py /dev/ttyUSB0 57600 -n
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# -n
 
-    App-only extraction (automatic filename with  -n and _app suffix):
-        python3 odu_dump.py /dev/ttyUSB0 57600 -n -a
+    App-only extraction (automatic filename with -n and _app suffix):
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# -n -a
 
     Full extraction with explicit filename:
-        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# custom.bin
 
     Auto naming with directory creation:
-        python3 odu_dump.py /dev/ttyUSB0 57600 -n dir/
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# -n dir/
 
     Explicit filename with directory:
-        python3 odu_dump.py /dev/ttyUSB0 57600 dir/custom.bin
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# dir/custom.bin
 
     Custom explicit range (overriding 'id' parsing):
-        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin 0x10000 0x10001
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# custom.bin 0x10000 0x10001
 
     Resume interrupted extraction (auto-detected from file size and flag):
-        python3 odu_dump.py /dev/ttyUSB0 57600 -n
-        python3 odu_dump.py /dev/ttyUSB0 57600 -a -n
-        python3 odu_dump.py /dev/ttyUSB0 57600 custom.bin 0x10000 0x10001
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# -n
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# -a -n
+        python3 odu_dump.py /dev/ttyUSB0 57600 -v# custom.bin 0x10000 0x10001
 
 NOTES:
     * All commands are read-only ('header', 'id', and 'dw'); no flash
