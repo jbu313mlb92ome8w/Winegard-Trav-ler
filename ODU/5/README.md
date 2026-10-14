@@ -1,7 +1,7 @@
-#### ODU>`header`<br>
+#### TRK>`header`<br>
 Not available on this version.
 
-#### ODU>`id`<br>
+#### TRK>`id`<br>
 System ID:   SAM<br>
 Board ID:    Tracker<br>
 Board Rev:   4<br>
@@ -29,3 +29,6 @@ NVS Size:                1000<br>
 
 #### STATS>`r`<br>
 Not available on this version.
+
+## Notes
+The prompt on this board reads "TRK>" like the Winegaurd Carryout OG.<br>
