@@ -5,7 +5,7 @@ Multiple version numbers can be found throughout the ODU debug terminal. The one
   - `header` is not an available command on the older boards. That is when `id` is used for the version. 
 
 The .bin files are labeled as follows:<br>
-(odu)_(#)_(ver)_(full/app).bin<br>
+"(odu)_(#)_(ver)_(full/app).bin"<br>
 - "full" is for the complete flash of the MCU, including the bootloader.
 - "app" is for the portion of the MCU flash that we see in the debug menu.
 
