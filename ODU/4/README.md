@@ -45,3 +45,8 @@ NVS Size:                   0<br>
  Sweeps:   1892<br>
  Stows:    54<br>
  Homes:    62<br>
+
+## Notes:
+This is a MAY 2017, but unlike the rest of MAY 2017 boards it reports its Board Revision as 5, instead of 6.<br>
+This firmware requires an IDU to run. Power and connecting to the ODU alone will not make it past the boot stage.<br>
+Theory, this board was flashed with firmware that is meant for the MAR 2016 boards and that is why it reports as Rev 5. Probably does not explain why the IDU is required for debug operation.
