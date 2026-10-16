@@ -30,5 +30,5 @@ NVS Size:                1000<br>
 #### STATS>`r`<br>
 Not available on this version.
 
-## Notes
+## Notes:
 The prompt on this board reads "TRK>" like the Winegaurd Carryout OG.<br>
