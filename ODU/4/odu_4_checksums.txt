@@ -1,0 +1,6 @@
+# SHA256
+odu_4_v1.12.23_app.bin
+odu_4_v1.12.23_full.bin
+# MD5
+odu_4_v1.12.23_app.bin
+odu_4_v1.12.23_full.bin
