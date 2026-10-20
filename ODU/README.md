@@ -18,8 +18,10 @@ This is still in testing.<br>
 I plan to use the extracted firmware from a MAY 2017 SK-1000 board and flash it to a bricked MAR 2016 SK-1000 board. Hopefully the only differences between the two is the slight layout change.<br>
 
 Run 'odu_dump.py -h' for usage and examples.
-- Use the `-v1` flag for older boards with "TRK>" prompt and takes around 30 minutes to run. 
+- Use the `-v1` flag for older boards with "TRK>" prompt and takes around 30 minutes to run.
+  - The primary MCU appears to be a MCU OKI L67Q5003A-NNN
 - Use the `-v3` flag for modern boards with "ODU>" prompt and takes around 2 hours to run.
+  - The primary MCU appears to be a NXP MK64FN1M0VLQ12.
 - The difference is because of the ODU TX buffer size limit and flash sizes of the MCUs.
 
 Overview: Extract the firmware in chunks using the `dw` command. The chunks are read from the serial output and wrote to the destination .bin file.
