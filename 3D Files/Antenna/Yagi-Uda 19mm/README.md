@@ -3,7 +3,7 @@ A mount for a Yagi-Uda antenna or others that have a 19mm x 19mm x 120mm square 
 - Designed to directly mount to the skew motor plate (no satellite mounting hardware at all) for either the SM or LG model.
 - The base plate is 10mm thick.
 - The screw holes are 8mm so the bolts slide through.
-- The designed max the head the bolt can have is 11.85mm.
+- The designed max the head of the bolt can have is 11.85mm.
 - The mm in the file names denotes the width of the gussets.
 - Files without holes are friction fit only. And it is a chef's kiss friction fit.
 - Files with holes create a way to add zip ties or other means to help secure the antenna. Unlikely needed, but available.
