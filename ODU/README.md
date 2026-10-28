@@ -46,3 +46,5 @@ Run `python3 odu_bl_upload.py --make-s19 input.bin output.s19` to create the nee
 Run `python3 odu_bl_upload.py /dev/PORT 57600 output.s19`
 - Takes around 25 minutes to complete.
 - Upon success the ODU will reboot on its own and show App boot output.
+
+Being that firmware can be flashed to the ODU, a custom or modified firmware could be created to better suit the radio/satellite hobby. Maybe even finally fix the MOT help menu typo of "az sk el" to "az el sk".
