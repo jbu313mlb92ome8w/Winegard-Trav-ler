@@ -9,7 +9,7 @@ The .bin files are labeled as follows:<br>
 - "full" is for the complete flash of the MCU, including the bootloader.
 - "app" is for the portion of the MCU flash that we see in the debug menu.
 
-IDU and ODU numbers do not correspond to each other unless there is a `@` with the numbers. See [ODU Wiki](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/ODU) for more details.<br>
+[Known IDU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/Standard--IDU--Known) and [Known ODU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/Standard--ODU--Known) numbers do not correspond to each other unless there is a `@` with the numbers. See [ODU Wiki]([https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/ODU](https://github.com/jbu313mlb92ome8w/Winegard-Trav-ler/wiki/Standard--ODU)) for more details.<br>
 
 ## Firmware Extraction Method
 I advise creating a backup bin file and documenting the info like in the listed ODUs. Even if you don't delve too deep into the menus you never know what can happen.<br>
