@@ -1,8 +1,8 @@
 This `dir` and its subs are for the ODU Firmware and other related files.<br>
 
 Multiple version numbers can be found throughout the ODU debug terminal. The one used for file names is based off the `header` or `id` command.
-- `header` and `id` are not shown with the `?` command. To see them and their description run `d?`.
-  - `header` is not an available command on the older boards. That is when `id` is used for the version. 
+- `header` is not shown with the `?` command. To see it and the description run `d?`.
+  - `header` is not an available command on the older pre 2016 boards. That is when `id` is used for the version. 
 
 The .bin files are labeled as follows:<br>
 `(odu)_(#)_(ver)_(full/app).bin`<br>
