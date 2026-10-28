@@ -42,6 +42,7 @@ Successfully flashed extracted firmware from a MAY 2017 SK-1000 board to a brick
 Run `python3 odu_bl_upload.py --make-s19 input.bin output.s19` to create the needed file to stream to the ODU.
 - Full or App bin files can be used for the s19 file. The booatloader only accepts the App section of the bin/s19.
 - The bootloader protects the NVS and other settings, such as the steps per motor, even when erasing using the `ld` command.
-Run ``python3 odu_bl_upload.py /dev/PORT 57600 output.s19`
+
+Run `python3 odu_bl_upload.py /dev/PORT 57600 output.s19`
 - Takes around 25 minutes to complete.
 - Upon success the ODU will reboot on its own and show App boot output.
