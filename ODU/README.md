@@ -34,7 +34,7 @@ Notes:
 
 ## Firmware Flash to ODU Method
 I guarantee nothing. I advise to only do this if absolutely needed.<br>
-I don't suggest running this to update App versions just because you can/want to. Thankfully this has worked in this one instance. I do not plan on testing this any further unless I brick another board. I don't see why this won't work for any of the NXP boards as long as the bootloader is intact. This method is for those that are experimenting and learning what the ODUs can do and mess something up.<br>
+I don't suggest running this to update App versions just because you can/want to. Thankfully this has worked in this one instance. I do not plan on testing this any further unless I brick another board. I will help someone as much as I can if they brick theirs. I don't see why this won't work for any of the NXP boards as long as the bootloader is intact. This method is for those that are experimenting and learning what the ODUs can do and mess something up.<br>
 
 This currently only works for the ODU boards with the NXP MK64FN1M0VLQ12 MCU. The non NXP MCU boards operate differently.<br>
 Successfully flashed extracted firmware from a MAY 2017 SK-1000 board to a bricked MAR 2016 SK-1000 board.<br>
