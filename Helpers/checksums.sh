@@ -80,11 +80,17 @@ output_name_for() {
 # -------------------------------------------------------------- #
 # @sec_generate
 # Writes the per-directory checksum file into the target.
+# Covers .bin and .s19 files.
 # -------------------------------------------------------------- #
 generate_for_dir() {
-    local dir="$1" bins name out reply
-    bins=( "$dir"/*.bin )
-    if [[ ! -e ${bins[0]} ]]; then
+    local dir="$1" f files name out reply
+    files=()
+    for f in "$dir"/*.bin "$dir"/*.s19; do
+        if [[ -e $f ]]; then
+            files+=("$f")
+        fi
+    done
+    if (( ${#files[@]} == 0 )); then
         return 0
     fi
     name="$(output_name_for "$dir")"
@@ -96,11 +102,11 @@ generate_for_dir() {
     (
         cd "$dir"
         printf '# SHA256\n'
-        sha256sum -- *.bin | sort_bin_lines
+        sha256sum -- *.bin *.s19 2>/dev/null | sort_bin_lines || true
         printf '# MD5\n'
-        md5sum -- *.bin | sort_bin_lines
+        md5sum -- *.bin *.s19 2>/dev/null | sort_bin_lines || true
     ) > "$out"
-    echo "wrote: $out (${#bins[@]} .bin files)"
+    echo "wrote: $out"
 }
 
 # -------------------------------------------------------------- #
@@ -117,8 +123,8 @@ consolidated_name_for() {
 # -------------------------------------------------------------- #
 # @sec_sort_lines
 # Sorts checksum lines from stdin: names matching the canonical
-# format (unit_N_vX.Y.Z_suffix.bin) sort first, ordered by the
-# token after the last underscore; non-conforming names follow.
+# format (unit_N_vX.Y.Z_suffix.bin/.s19) sort first, ordered by
+# the token after the last underscore; non-conforming names follow.
 # The original "hash  filename" line is preserved verbatim.
 # -------------------------------------------------------------- #
 sort_bin_lines() {
@@ -130,10 +136,10 @@ sort_bin_lines() {
             n = split($0, p, "/")
             base = p[n]
             key = "1|zz|"
-            if (base ~ /^[A-Za-z0-9-]+_[0-9]+_v[0-9]+\.[0-9]+\.[0-9]+_[a-z0-9-]+\.bin$/) {
+            if (base ~ /^[A-Za-z0-9-]+_[0-9]+_v[0-9]+\.[0-9]+\.[0-9]+_[a-z0-9-]+\.(bin|s19)$/) {
                 tail = base
                 sub(/^.*_/, "", tail)
-                sub(/\.bin$/, "", tail)
+                sub(/\.(bin|s19)$/, "", tail)
                 key = "0|" tail "|"
             }
             print key hash "  " $0
@@ -143,15 +149,15 @@ sort_bin_lines() {
 
 # -------------------------------------------------------------- #
 # @sec_write_consolidated
-# Collects all .bin files from target subdirs and writes one
+# Collects .bin and .s19 files from target subdirs and writes one
 # checksum file in the parent directory. Each hash-type section
 # is collected whole, then sorted once per @sec_sort_lines.
-# Subdirectories with no .bin files are skipped silently.
+# Subdirectories with no matching files are skipped silently.
 # -------------------------------------------------------------- #
 write_consolidated_for() {
     local parent="$1"
     local out="$parent/$(consolidated_name_for "$parent")"
-    local tmp reply sub rel bins block
+    local tmp reply sub f rel files block
     tmp="$(mktemp)"
     trap 'rm -f "$tmp"' EXIT
 
@@ -164,10 +170,16 @@ write_consolidated_for() {
     block=""
     for sub in "$parent"/*/; do
         [[ -d $sub ]] || continue
-        bins=( "$sub"*.bin )
-        [[ -e ${bins[0]} ]] || continue
-        rel="${sub#"$parent"/}"
-        block+="$( cd "$parent" && sha256sum -- "$rel"*.bin )"$'\n'
+        files=()
+        for f in "$sub"*.bin "$sub"*.s19; do
+            if [[ -e $f ]]; then
+                files+=("${f#"$parent"/}")
+            fi
+        done
+        if (( ${#files[@]} == 0 )); then
+            continue
+        fi
+        block+="$( cd "$parent" && sha256sum -- "${files[@]}" )"$'\n'
     done
     printf '%s' "$block" | sort_bin_lines >> "$tmp"
 
@@ -175,10 +187,16 @@ write_consolidated_for() {
     block=""
     for sub in "$parent"/*/; do
         [[ -d $sub ]] || continue
-        bins=( "$sub"*.bin )
-        [[ -e ${bins[0]} ]] || continue
-        rel="${sub#"$parent"/}"
-        block+="$( cd "$parent" && md5sum -- "$rel"*.bin )"$'\n'
+        files=()
+        for f in "$sub"*.bin "$sub"*.s19; do
+            if [[ -e $f ]]; then
+                files+=("${f#"$parent"/}")
+            fi
+        done
+        if (( ${#files[@]} == 0 )); then
+            continue
+        fi
+        block+="$( cd "$parent" && md5sum -- "${files[@]}" )"$'\n'
     done
     printf '%s' "$block" | sort_bin_lines >> "$tmp"
 
