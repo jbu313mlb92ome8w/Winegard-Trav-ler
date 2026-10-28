@@ -1,4 +1,4 @@
-The following prompt was very kindly provided to me and provided the breakthrough needed to flash the bricked ODU.
+The following prompt and resulting odu_bl_upload.py script was very kindly provided to me and provided the breakthrough needed to flash the bricked ODU.
 
 
 ################################################################
