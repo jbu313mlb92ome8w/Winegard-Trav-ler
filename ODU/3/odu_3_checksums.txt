@@ -1,6 +1,8 @@
 # SHA256
 c027992bcab83e5eb376a1e6b0baafec7f272b6facf602d7bc8877c30aecdaa5  odu_3_v1.12.68_app.bin
 24509486ffea07874cfea67ec933fde33cb42218cc7a68e8b21351975df75c76  odu_3_v1.12.68_full.bin
+52a212281d6ba940ea2c39a820b0b80dfc73e2b45470beafbeba81b460d93e7b  odu_3_v1.12.68.s19
 # MD5
 ebc4ba727dd3f3ea182e51ad7444145e  odu_3_v1.12.68_app.bin
 9e5ab1556727be594d3d90b42d7ab4ef  odu_3_v1.12.68_full.bin
+2c583c1ab80d40fb5d3fcb4933ef5a75  odu_3_v1.12.68.s19
