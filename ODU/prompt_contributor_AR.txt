@@ -1,0 +1,60 @@
+The following prompt was very kindly provided to me and provided the breakthrough needed to flash the bricked ODU.
+
+
+################################################################
+
+
+I disassembled ODU/4's bootloader and worked out exactly what it expects. Your friend's symptom ("it sees data on the flash, but won't boot it") matches a specific mechanism in the code. It also proves the dumps are byte-perfect.
+
+What the bootloader expects (version 04.00.0A, the same on every K64 board dumped)
+
+ld
+- It erases 0x10000–0xFEFFF. The last sector (0xFF000, the per-unit settings) is left alone.
+- It then prints Please start S-REC/iHex download:.
+
+Input format
+- It accepts S-records (S1, S2 or S3) and Intel HEX. A raw .bin gets Record-error on the first line.
+- Each line is processed when a CR arrives; LF characters are ignored.
+
+Reply after each record
+
+┌───────────────────┬─────────────────────────────────────────────────────────────┐
+│       Reply       │                           Meaning                           │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ .                 │ Record written.                                             │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ !                 │ Address outside 0x10000–0xFEFFF, so the record was skipped. │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ Record-error      │ Line doesn't parse.                                         │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ CS-error          │ Line checksum is wrong.                                     │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ Programming-error │ Flash write failed.                                         │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ Code hole!!       │ Addresses jumped instead of running in order.               │
+└───────────────────┴─────────────────────────────────────────────────────────────┘
+
+There's no flow control. The bootloader reads the serial port one character at a time and stops reading while it writes flash. A file streamed at full speed from minicom loses characters, which shows up as CS-error, Record-error or Code hole.
+
+The key mechanism, which explains the symptom:
+- The first 8 bytes at 0x10000 hold the ADBCCBDA signature. The bootloader keeps them in RAM and writes them to flash only when the end record (S7, S8 or S9) arrives.
+- Then it prints Terminated - restarting... and reboots. That message means success, even though it reads like an error.
+- If the end record never arrives, or the file has no end record, the rest of the app is written but the signature is still blank. Every boot then says No Application Header.
+- If the file was converted from app.bin without moving it to 0x10000, everything lands 64 KB too low or is rejected with !. That also gives "data on the flash, but no header".
+
+What happens at boot
+- No signature → it stays in the menu with No Application Header.
+- Stored checksum is 0xDEADBEEF → it skips the CRC check and starts the app. The ODU/1 wiki notes say "deadbeef" appeared in its version info. That was probably this placeholder, written while the earlier load was in progress.
+- Otherwise it checks the CRC:
+  - CRC-32, polynomial 0x04C11DB7, initial value 0xFFFFFFFF, fed MSB-first in augmented form (the stored CRC is fed in last).
+  - It covers 0x10100 up to 0x10100 + the length field.
+  - The result has to come out as 0.
+- I ran that check on the ODU/4 and ODU/6 dumps, and both pass exactly. So the dw extraction method is correct, byte for byte.
+
+Tool to use
+
+I wrote /tmp/claude-1000/odu-bl/odu_bl_upload.py. It sends ld, waits for the prompt, then sends one record at a time and waits for the . before sending the next. On an error it sends Ctrl-C and stops, then waits for Terminated - restarting.... The S-record file it built from ODU/4 is /tmp/claude-1000/odu-bl/odu_4_v1.12.23_app.s19. It starts at 0x10000, has every address in order and ends with an S7 record. The file it builds from app.bin and from full.bin is identical.
+
+python3 odu_bl_upload.py /dev/ttyUSB0 57600 odu_4_v1.12.23_app.s19
+
+The script has not been run against hardware. The behaviour it relies on comes from reading the disassembly. Expect roughly 10–15 minutes for 28,734 records. Close minicom first so the port is free. If it stops with an error, the message it prints shows the record it failed on.
