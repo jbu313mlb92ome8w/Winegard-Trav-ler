@@ -16,9 +16,9 @@ I advise creating a backup bin file and documenting the info like in the listed 
 
 Run 'python3 odu_dump.py -h' for usage and examples.
 - Use the `-v1` flag for older boards with "TRK>" prompt and takes around 30 minutes to run.
-  - The primary MCU appears to be a MCU OKI L67Q5003A-NNN
+  - The primary MCU is a OKI L67Q5003A-NNN.
 - Use the `-v3` flag for modern boards with "ODU>" prompt and takes around 2 hours to run.
-  - The primary MCU appears to be a NXP MK64FN1M0VLQ12.
+  - The primary MCU is a NXP MK64FN1M0VLQ12.
 - The difference is because of the ODU TX buffer size limit and flash sizes of the MCUs.
 
 Overview: Extract the firmware in chunks using the `dw` command. The chunks are read from the serial output and wrote to the destination .bin file.
