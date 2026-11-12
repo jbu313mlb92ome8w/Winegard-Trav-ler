@@ -7,3 +7,8 @@ A bit more in-depth version of this built into `odu_dump.py` for resuming files.
 #### Header Parser
 header_parser.py<br>
 Uses a .bin file to extract the memory headers. I've only used it will full firmware extractions. Kinda pointless on partials?<br>
+
+#### Angle to Step(atos) Table
+atos_table.py<br>
+Creates tables of angle(s) to step(s) for the motors. Detects steps automatically and knows if SM or LG model; relevant to the EL motor.<br>
+run `atos_table.py -h` for different options.<br>
