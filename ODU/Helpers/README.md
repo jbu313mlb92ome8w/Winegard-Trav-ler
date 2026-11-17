@@ -6,7 +6,7 @@ A bit more in-depth version of this built into `odu_dump.py` for resuming files.
 
 #### Header Parser
 header_parser.py<br>
-Uses a .bin file to extract the memory headers. I've only used it will full firmware extractions. Kinda pointless on partials?<br>
+Uses a .bin file to extract the memory headers. I've only used it with full firmware extractions. Kinda pointless on partials?<br>
 
 #### Angle to Step(atos) Table
 atos_table.py<br>
