@@ -11,6 +11,7 @@ import serial
 
 # ---------------- [CONFIG] ----------------
 MOTOR_RANGES = {"az": (0.0, 450.0), "el": (-58.5, 95.0), "sk": (-95.0, 95.0)}
+MOTOR_RANGES_SAFE = {"az": (5.0, 450.0), "el": (-5.0, 94.0), "sk": (-90.0, 90.0)}
 EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"}
 AZ_STEPS = 6600
 SK_STEPS = 2400
@@ -20,15 +21,21 @@ SPR_RE = re.compile(r"steps/rev\s*=\s*(\d+)")
 
 # ---------------- [ARG PARSER] ----------------
 def parse_args():
+    def _desc(tbl):
+        return ", ".join("%s=%g..%g" % (k, v[0], v[1]) for k, v in tbl.items())
     p = argparse.ArgumentParser(
-        description="Query ODU 'atos' and build angle-to-steps tables; package auto-detected from dcmc motor probe",
-        epilog="note: --range bounds outside a motor's safe travel are clamped to that motor's limits; --angles values outside travel are skipped")
+        description="Query ODU MOT> menu command 'atos' and build angle-to-steps tables; LG or SM package auto-detected from dcmc motor probe.\n"
+                    "Default sweeps use safe ranges %s\n"
+                    "\nNote: Requested ranges outside a motor's safe envelope are permitted but warned; "
+                    "out-of-travel values are clamped to the motor's limits; --angles values outside travel are skipped" % (_desc(MOTOR_RANGES_SAFE)),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("-d", "--device", required=True, help="serial device path, e.g. /dev/ttyUSB0")
     p.add_argument("-b", "--baud", required=True, type=int, help="serial baud rate, e.g. 57600")
     p.add_argument("-m", "--motors", required=True, help="comma-separated motor list: az,el,sk")
     p.add_argument("-s", "--step", type=float, help="angle increment in degrees; required for all sweep modes")
     p.add_argument("--angles", help="comma-separated explicit angles, e.g. 405,405.5,-12.25; exempts -s")
     p.add_argument("--range", help="bounded sweep as lo:hi, e.g. -10:20; -s still required; clamped to motor limits")
+    p.add_argument("--full", action="store_true", help="default whole-envelope sweeps use factory travel %s instead of safe ranges" % _desc(MOTOR_RANGES))
     p.add_argument("--retries", type=int, default=2, help="resend attempts when no parseable reply arrives")
     p.add_argument("--timeout", type=float, default=1.5, help="seconds to wait for each reply")
     p.add_argument("-f", "--format", required=True, choices=["csv", "md"], help="table file format; dictates the file extension")
@@ -95,19 +102,24 @@ def angle_series(lo, hi, step):
     return out
 
 def build_plan(args, mo):
-    lo, hi = MOTOR_RANGES[mo]
+    flo, fhi = MOTOR_RANGES[mo]
+    slo, shi = MOTOR_RANGES_SAFE[mo]
     if args.angles:
-        angles = [a for a in args.angles if lo <= a <= hi]
-        skipped = [a for a in args.angles if not (lo <= a <= hi)]
-        return {"motor": mo, "angles": angles, "skipped": skipped, "c_lo": None, "c_hi": None, "clamped": False}
+        angles = [a for a in args.angles if flo <= a <= fhi]
+        skipped = [a for a in args.angles if not (flo <= a <= fhi)]
+        risky = [a for a in angles if not (slo <= a <= shi)]
+        return {"motor": mo, "angles": angles, "skipped": skipped, "risky": risky, "c_lo": None, "c_hi": None, "clamped": False}
     if args.range:
-        c_lo = max(lo, args.range[0])
-        c_hi = min(hi, args.range[1])
+        c_lo = max(flo, args.range[0])
+        c_hi = min(fhi, args.range[1])
         clamped = (c_lo, c_hi) != (args.range[0], args.range[1])
-        if c_hi < lo or c_lo > hi:
-            return {"motor": mo, "angles": [], "skipped": [], "c_lo": c_lo, "c_hi": c_hi, "clamped": clamped}
-        return {"motor": mo, "angles": angle_series(c_lo, c_hi, args.step), "skipped": [], "c_lo": c_lo, "c_hi": c_hi, "clamped": clamped}
-    return {"motor": mo, "angles": angle_series(lo, hi, args.step), "skipped": [], "c_lo": lo, "c_hi": hi, "clamped": False}
+        risky = args.range[0] < slo or args.range[1] > shi
+        if c_hi < flo or c_lo > fhi:
+            return {"motor": mo, "angles": [], "skipped": [], "risky": [], "c_lo": c_lo, "c_hi": c_hi, "clamped": clamped}
+        return {"motor": mo, "angles": angle_series(c_lo, c_hi, args.step), "skipped": [], "risky": [], "c_lo": c_lo, "c_hi": c_hi, "clamped": clamped}
+    lo, hi = (MOTOR_RANGES[mo] if args.full else MOTOR_RANGES_SAFE[mo])
+    tok = "rfull" if args.full else "rsafe"
+    return {"motor": mo, "angles": angle_series(lo, hi, args.step), "skipped": [], "risky": [], "c_lo": lo, "c_hi": hi, "clamped": False, "tok": tok}
 
 def inferred_paths(args, pkg, plans):
     ext = "." + args.format
@@ -119,7 +131,7 @@ def inferred_paths(args, pkg, plans):
         if args.angles:
             base = "%s_%s_spot_%s" % (pkg, mjoin, ",".join(fmt_angle(a) for a in args.angles))
         else:
-            rtok = ("r%s..%s" % (fmt_angle(args.range[0]), fmt_angle(args.range[1]))) if args.range else "rfull"
+            rtok = ("r%s..%s" % (fmt_angle(args.range[0]), fmt_angle(args.range[1]))) if args.range else ("rfull" if args.full else "rsafe")
             base = "%s_%s_%s_%s" % (pkg, mjoin, stok, rtok)
         paths["_all"] = os.path.join(outdir, base + ext)
     else:
@@ -267,6 +279,11 @@ def main():
             lo, hi = MOTOR_RANGES[mo]
             if plan["skipped"]:
                 print("skipped out-of-range angles for %s: %s" % (mo, ", ".join(fmt_angle(a) for a in plan["skipped"])))
+            if plan.get("tok"):
+                print("envelope: %s" % plan["tok"])
+            if plan["risky"]:
+                slo, shi = MOTOR_RANGES_SAFE[mo]
+                print("WARNING: %s requests outside safe envelope %g..%g; proceeding under user responsibility" % (mo, slo, shi))
             if plan["clamped"]:
                 print("WARNING: %s range %s..%s clamped to %s..%s at motor limits" % (
                     mo, fmt_angle(args.range[0]), fmt_angle(args.range[1]), fmt_angle(plan["c_lo"]), fmt_angle(plan["c_hi"])))
@@ -274,7 +291,9 @@ def main():
                 print("no valid angles for %s, continuing" % mo)
                 continue
             print("=" * 72)
-            print("PACKAGE=%s MOTOR=%s RANGE=%g..%g STEP=%s ROWS=%d" % (pkg, mo, lo, hi, step_disp, len(plan["angles"])))
+            print("PACKAGE=%s MOTOR=%s MODE=%s SAFE=%g..%g STEP=%s ROWS=%d" % (
+                pkg, mo, "full" if args.full else "safe",
+                MOTOR_RANGES_SAFE[mo][0], MOTOR_RANGES_SAFE[mo][1], step_disp, len(plan["angles"])))
             print("=" * 72)
             print("%12s %12s" % ("ANGLE", "STEPS"))
             smin = None
