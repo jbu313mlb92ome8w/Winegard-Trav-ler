@@ -6,7 +6,6 @@ import os
 import re
 import sys
 import time
-
 import serial
 
 # ---------------- [CONFIG] ----------------
@@ -16,7 +15,7 @@ EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"}
 AZ_STEPS = 6600
 SK_STEPS = 2400
 SETTLE = 0.25
-STEPS_RE = re.compile(r"Steps\s*=\s*(-?\d+)")
+STEPS_RE = re.compile(r"Steps\s*=\s*(-?\d+)\s*\r")
 SPR_RE = re.compile(r"steps/rev\s*=\s*(\d+)")
 
 # ---------------- [ARG PARSER] ----------------
