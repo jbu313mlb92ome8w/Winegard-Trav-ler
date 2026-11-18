@@ -11,6 +11,7 @@ import serial
 # ---------------- [CONFIG] ----------------
 MOTOR_RANGES = {"az": (0.0, 450.0), "el": (-58.5, 95.0), "sk": (-95.0, 95.0)}
 MOTOR_RANGES_SAFE = {"az": (5.0, 450.0), "el": (-5.0, 94.0), "sk": (-90.0, 90.0)}
+MOTOR_INDEX = {"az": 0, "el": 1, "sk": 2}
 EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"}
 AZ_STEPS = 6600
 SK_STEPS = 2400
@@ -212,7 +213,7 @@ def probe_motors(ser, verbose):
     return pkg
 
 def query_atos(ser, motor, angle, retries, timeout, verbose):
-    cmd = "atos %s %s" % (motor, fmt_angle(angle))
+    cmd = "atos %d %s" % (MOTOR_INDEX[motor], fmt_angle(angle))
     for _ in range(retries + 1):
         ser.reset_input_buffer()
         ser.write((cmd + "\r").encode("ascii"))
