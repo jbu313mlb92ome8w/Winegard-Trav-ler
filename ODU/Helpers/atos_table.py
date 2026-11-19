@@ -260,10 +260,18 @@ def main():
     t0 = time.time()
     rows = []
     failures = []
-    ser = serial.Serial(args.device, args.baud, timeout=0.1)
+    ser = None
     try:
-        ser = serial.Serial(args.device, args.baud, timeout=0.1)
-    except serial.SerialException as exc:
+        import serial
+        ser = serial.Serial()
+        ser.port = args.device
+        ser.baudrate = args.baud
+        ser.timeout = 0.1
+        ser.dtr = False
+        ser.rts = False
+        ser.open()
+        ser.exclusive = True
+    except Exception as exc:
         sys.exit("cannot open %s: %s" % (args.device, exc))
     verify_link(ser, args.verbose)
     try:
