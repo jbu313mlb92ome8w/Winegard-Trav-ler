@@ -21,20 +21,16 @@ AZ_MAX_DEG = 445.0
 EL_MIN_DEG = -5.0
 EL_MAX_DEG = 94.0
 DEADBAND_DEG = 0.5
-QC_TOLERANCE_DEG = 3.0
 # 14.9 is tested max that can be used; probably firmware limited to trigger stall on 15+.
 EL_CONCURRENT_MAX_DEG = 14.5
 # 1.1 is tested min that can be used. increase if stalling occurs.
 START_GAP_SEC = 1.1
 SETTLE = 0.1
-PARK_AZ_DEG = 0
-PARK_EL_DEG = 0
+PARK_AZ_DEG = 167.7
+PARK_EL_DEG = 50.6
 IDLE_PARK_SEC = 300
 MOTOR_AZ = 0
 MOTOR_EL = 1
-MOTOR_SK = 2
-SK_ZERO_ANGLE = 45
-ZERO_SK_ON_START = True
 EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"}
 INFO_STRING = "dcmc_rotor Winegard Trav'ler via dcmc (rotctld emulation)"
 
@@ -71,10 +67,9 @@ class MotorTable:
         self.motor = motor
         self.angles = [r[0] for r in rows]
         self.steps = [r[1] for r in rows]
-        angles_mono = all(self.angles[i] < self.angles[i + 1] for i in range(len(self.angles) - 1))
-        steps_mono = all(self.steps[i] <= self.steps[i + 1] for i in range(len(self.steps) - 1))
-        if not angles_mono or not steps_mono or len(rows) < 2:
-            sys.exit("table audit failed for '%s': angles not strictly monotonic, steps not non-decreasing, or too short" % motor)
+        mono = all(self.steps[i] < self.steps[i + 1] for i in range(len(self.steps) - 1))
+        if not mono or len(rows) < 2:
+            sys.exit("table audit failed for '%s': not strictly monotonic or too short" % motor)
 
     def angle_to_steps(self, angle):
         # forward conversion with linear interpolation between table rows
@@ -110,7 +105,7 @@ def load_tables(tables_dir, pkg, verbose):
         sys.exit("no table file matching %s" % pattern)
     if len(matches) > 1:
         log("WARNING: multiple table files found, using first of %s" % matches)
-    rows = {"az": [], "el": [], "sk": []}
+    rows = {"az": [], "el": []}
     with open(matches[0]) as fh:
         for rec in csv.DictReader(fh):
             if rec["motor"] in rows:
@@ -118,11 +113,10 @@ def load_tables(tables_dir, pkg, verbose):
     tables = {}
     for motor, recs in rows.items():
         tables[motor] = MotorTable(motor, recs)
-    log("tables loaded from %s: az %d rows (%g..%g), el %d rows (%g..%g), sk %d rows (%g..%g)" % (
+    log("tables loaded from %s: az %d rows (%g..%g), el %d rows (%g..%g)" % (
         matches[0],
         len(tables["az"].angles), tables["az"].angles[0], tables["az"].angles[-1],
-        len(tables["el"].angles), tables["el"].angles[0], tables["el"].angles[-1],
-        len(tables["sk"].angles), tables["sk"].angles[0], tables["sk"].angles[-1]))
+        len(tables["el"].angles), tables["el"].angles[0], tables["el"].angles[-1]))
     return tables
 
 # ---------------- [SERIAL] ----------------
@@ -205,7 +199,7 @@ def leave_dcmc(ser):
         pass
 
 def probe_package(ser, verbose):
-    # one 'i' dump identifies the el steps/rev (package) and skew steps/rev (skew math)
+    # one 'i' dump identifies the el steps/rev and thereby the satellite package
     send(ser, "i")
     buf = read_until(ser, "dcmc >", 3.0)
     if verbose:
@@ -220,15 +214,8 @@ def probe_package(ser, verbose):
     if el_spr not in EL_STEPS_TO_PKG:
         sys.exit("unrecognized el steps/rev %d; known: %s" % (el_spr, EL_STEPS_TO_PKG))
     pkg = EL_STEPS_TO_PKG[el_spr]
-    mt = re.search(r"Skew:(.*)", buf, re.S)
-    if not mt:
-        sys.exit("probe failed: no Skew section in 'i' output")
-    spr = re.search(r"steps/rev\s*=\s*(\d+)", mt.group(1))
-    if not spr:
-        sys.exit("probe failed: no steps/rev in Skew section")
-    sk_spr = int(spr.group(1))
-    log("probe: el steps/rev=%d -> package=%s, skew steps/rev=%d" % (el_spr, pkg, sk_spr))
-    return pkg, sk_spr
+    log("probe: el steps/rev=%d -> package=%s" % (el_spr, pkg))
+    return pkg
 
 # ---------------- [DCMC_OPS] ----------------
 class SessionLost(Exception):
@@ -280,21 +267,6 @@ def query_positions(ser, verbose):
         log("WARNING: position parse incomplete: %r" % buf[-200:])
         return None
     return pos
-
-STATUS_ENTRY_RE = re.compile(r"\[(\d)\]\s*Cmd\s+(Complete|In Progress)")
-
-def query_motor_status(ser, verbose):
-    # one 't' round trip yields per-motor Complete / In Progress, entries ordered az then el
-    send(ser, "t")
-    buf = read_until(ser, "dcmc >", 3.0)
-    if verbose:
-        log("status raw", raw=buf)
-    for marker in BOOT_MARKERS:
-        if marker in buf:
-            raise SessionLost("dcmc session lost; ODU rebooted or at root prompt")
-    found = STATUS_ENTRY_RE.findall(buf)
-    return {"az": found[0][1] if len(found) > 0 else None,
-            "el": found[1][1] if len(found) > 1 else None}
 
 def goto_steps(ser, motor, steps, verbose):
     # dcmc accepts one motor per command; az and el are issued as separate writes
@@ -463,18 +435,6 @@ class RotorServer:
             ang_az = self.last_mount_az if self.last_mount_az is not None else 0.0
         if ang_el is None:
             ang_el = self.last_cmd_el if self.last_cmd_el is not None else 0.0
-        if self.last_cmd_az is not None and self._pending_az is None:
-            dev_az = abs(ang_az - self.last_cmd_az)
-            dev_el = abs((self.last_cmd_el if self.last_cmd_el is not None else ang_el) - ang_el)
-            if max(dev_az, dev_el) > QC_TOLERANCE_DEG:
-                mstat = query_motor_status(self.ser, self.verbose)
-                if mstat.get("az") == "Complete" and mstat.get("el") == "Complete":
-                    log("QC FAIL: cmd az %.2f el %.2f vs actual az %.2f el %.2f; re-issuing"
-                        % (self.last_cmd_az, self.last_cmd_el, ang_az, ang_el))
-                    steps_az = self.tables["az"].angle_to_steps(self.last_cmd_az)
-                    steps_el = self.tables["el"].angle_to_steps(self.last_cmd_el)
-                    if steps_az is not None and steps_el is not None:
-                        self._issue_dual(steps_az, steps_el, self.last_cmd_el, ang_el)
         client_az = (ang_az + HEADING_DEG) % 360.0
         return "%.3f\n%.3f\n" % (client_az, ang_el)
 
@@ -542,14 +502,8 @@ def main():
     srv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         enter_dcmc(ser, args.verbose)
-        pkg, sk_spr = probe_package(ser, args.verbose)
+        pkg = probe_package(ser, args.verbose)
         tables = load_tables(args.tables_dir, pkg, args.verbose)
-        if ZERO_SK_ON_START:
-            sk_steps = tables["sk"].angle_to_steps(SK_ZERO_ANGLE)
-            if sk_steps is None:
-                sys.exit("SK_ZERO_ANGLE %.2f outside skew table domain" % SK_ZERO_ANGLE)
-            goto_steps(ser, MOTOR_SK, sk_steps, args.verbose)
-            log("SKEW: %.2f deg -> motor %d steps %d issued at startup" % (SK_ZERO_ANGLE, MOTOR_SK, sk_steps))
         server = RotorServer(ser, tables, args.verbose, park_az=PARK_AZ_DEG, park_el=PARK_EL_DEG,
                              idle_park_sec=(0 if args.no_idle_park else IDLE_PARK_SEC))
         srv_sock.bind((args.address, args.port))
