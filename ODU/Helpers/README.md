@@ -12,3 +12,7 @@ Uses a .bin file to extract the memory headers. I've only used it with full firm
 atos_table.py<br>
 Creates tables of angle(s) to step(s) for the motors. Detects steps automatically and knows if SM or LG model; relevant to the EL motor.<br>
 run `atos_table.py -h` for different options.<br>
+
+#### rotctl
+dcmc_rotor.py<br>
+See folder README.md for details.
