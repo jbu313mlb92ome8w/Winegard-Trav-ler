@@ -30,3 +30,7 @@ Multiple layers of safeguards have been implemented, even at the cost of some VE
   - Elevation: -5 to 94
   - Skew: -90 to 90
     - No skew data is currently output by any known program. These are safe values though.
+  - lg_*.csv if for LG models and sm_*.csv is for SM models. This matters do not misname custom atos tables.
+
+#### Limitations
+This script does not account for passes that cross the azimuth limits. That is a limit of receiving live position data from the controlling software. A software that preprocesses passes and then calculates the best start position to prevent or minimize azimuth resets needs to be used.
