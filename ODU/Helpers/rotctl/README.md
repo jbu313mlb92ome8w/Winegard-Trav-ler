@@ -21,7 +21,7 @@ While using the dcmc menu does allow for both elevation and azimuth moves to be 
 - MOTOR_AZ = Azimuth motor number. Feeds several features. Don't change.
 - MOTOR_EL = Elevation motor number. Feeds several features. Don't change.
 - MOTOR_SK = Skew motor number. Feeds several features. Don't change.
-- SK_ZERO_STEPS = Useful if using an antenna that requires an offset from 0 position.
+- SK_ZERO_ANGLE = Useful if using an antenna that requires an offset from 0 position.
 - ZERO_SK_ON_START = True/False to enable setting the skew at every script start. It doesn't take much to manually change skew motor position.
 - EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"} = Used to determine is what Trav'ler elevation motors are present. Feeds several features. Don't change.
 
