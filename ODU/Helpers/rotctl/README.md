@@ -5,12 +5,13 @@ While using the dcmc menu does allow for both elevation and azimuth moves to be 
 
 #### Config
 - DCMC_ALLOWED = {"p", "s", "i", "t"} = Safeguard to make sure no other dcmc commands can be run. Don't change.
-- HEADING_DEG = True north heading.
+- HEADING_DEG = True north heading. All azimuths are calculated with this. 
 - AZ_MIN_DEG = Safeguard minimum azimuth degree. Must also be in atos csv file to go to value.
 - AZ_MAX_DEG = Safeguard maximum azimuth degree. Must also be in atos csv file to go to value.
 - EL_MIN_DEG = Safeguard minimum elevation degree. Must also be in atos csv file to go to value.
 - EL_MAX_DEG = Safeguard maximum elevation degree. Must also be in atos csv file to go to value.
 - DEADBAND_DEG = Incremental degrees to go to.
+- QC_TOLERANCE_DEG = My attempt at doing some QC on the positions being processed.
 - EL_CONCURRENT_MAX_DEG = Elevation maximum degree difference before triggering START_GAP_SEC delay. Max is 14.9 degrees, anything over will trigger elevation motor stall.
 - START_GAP_SEC = Time delay for large continuous movements. Min is 1.1 seconds.
 - SETTLE = serial command delay.
@@ -19,6 +20,9 @@ While using the dcmc menu does allow for both elevation and azimuth moves to be 
 - IDLE_PARK_SEC = Time to wait until moving to park position.
 - MOTOR_AZ = Azimuth motor number. Feeds several features. Don't change.
 - MOTOR_EL = Elevation motor number. Feeds several features. Don't change.
+- MOTOR_SK = Skew motor number. Feeds several features. Don't change.
+- SK_ZERO_STEPS = Useful if using an antenna that requires an offset from 0 position.
+- ZERO_SK_ON_START = True/False to enable setting the skew at every script start. It doesn't take much to manually change skew motor position.
 - EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"} = Used to determine is what Trav'ler elevation motors are present. Feeds several features. Don't change.
 
 #### Safeguards
