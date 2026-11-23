@@ -10,12 +10,14 @@ import serial
 
 # ---------------- [CONFIG] ----------------
 MOTOR_RANGES = {"az": (0.0, 450.0), "el": (-58.5, 95.0), "sk": (-95.0, 95.0)}
-MOTOR_RANGES_SAFE = {"az": (5.0, 450.0), "el": (-5.0, 94.0), "sk": (-90.0, 90.0)}
+MOTOR_RANGES_SAFE = {"az": (5.0, 445.0), "el": (-5.0, 94.0), "sk": (-90.0, 90.0)}
 MOTOR_INDEX = {"az": 0, "el": 1, "sk": 2}
 EL_STEPS_TO_PKG = {20800: "lg", 10750: "sm"}
 AZ_STEPS = 6600
 SK_STEPS = 2400
 SETTLE = 0.25
+QC_TOLERANCE_DEG = 5.0
+QC_TRIES = 3
 STEPS_RE = re.compile(r"Steps\s*=\s*(-?\d+)\s*\r")
 SPR_RE = re.compile(r"steps/rev\s*=\s*(\d+)")
 
@@ -230,6 +232,23 @@ def query_atos(ser, motor, angle, retries, timeout, verbose):
                     return int(mt.group(1))
     return None
 
+def query_atos_qc(ser, motor, angle, prev, slope, retries, timeout, verbose):
+    # query with trend QC: reject off-trend replies and retry until plausible or QC_TRIES exhausted
+    tries = 0
+    while tries < QC_TRIES:
+        tries += 1
+        steps = query_atos(ser, motor, angle, retries, timeout, verbose)
+        if steps is None:
+            return None, tries
+        if prev is None:
+            return steps, tries
+        expected = prev[1] + (angle - prev[0]) * slope
+        if abs(steps - expected) <= abs(slope) * QC_TOLERANCE_DEG:
+            return steps, tries
+        print("\nQC SUSPECT: %s %s replied %d, expected ~%d (try %d)" % (
+            motor, fmt_angle(angle), steps, round(expected), tries))
+    return None, tries
+
 # ---------------- [WRITERS] ----------------
 def write_rows(path, args, pkg, rows, motors):
     with open(path, "w") as fh:
@@ -304,15 +323,22 @@ def main():
                 MOTOR_RANGES_SAFE[mo][0], MOTOR_RANGES_SAFE[mo][1], step_disp, len(plan["angles"])))
             print("=" * 72)
             print("%12s %12s" % ("ANGLE", "STEPS"))
+            el_spr = [k for k, v in EL_STEPS_TO_PKG.items() if v == pkg][0]
+            slopes = {"az": AZ_STEPS / 360.0, "el": el_spr / 360.0, "sk": SK_STEPS / 360.0}
+            slope = slopes[mo]
+            prev = None
             smin = None
             smax = None
             for idx, a in enumerate(plan["angles"]):
-                steps = query_atos(ser, mo, a, args.retries, args.timeout, args.verbose)
+                steps, qc_used = query_atos_qc(ser, mo, a, prev, slope, args.retries, args.timeout, args.verbose)
                 if steps is None:
                     failures.append((mo, a))
                     print("%12s %12s" % (fmt_angle(a), "FAIL"))
                     continue
                 rows.append({"package": pkg, "motor": mo, "angle": fmt_angle(a), "steps": steps})
+                prev = (a, steps)
+                if qc_used > 1:
+                    print("\nQC ACCEPTED after %d tries: %s %s -> %d" % (qc_used, mo, fmt_angle(a), steps))
                 smin = steps if smin is None else min(smin, steps)
                 smax = steps if smax is None else max(smax, steps)
                 pct = (idx + 1) * 100 // len(plan["angles"])
