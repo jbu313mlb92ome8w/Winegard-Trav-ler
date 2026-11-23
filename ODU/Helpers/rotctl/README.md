@@ -25,11 +25,12 @@ While using the dcmc menu does allow for both elevation and azimuth moves to be 
 Multiple layers of safeguards have been implemented, even at the cost of some VERY minor increased processing.
 - Only certain set of allowed dcmc commands.
 - Script config limits.
-- Angle to Step(atos) tables that only have safe positions to go to, degrees and motor steps.
+- Angle to Step(atos) tables that only have safe positions to go to, degrees and motor steps. Information on default atos tables:
   - Azimuth: 5 to 445
   - Elevation: -5 to 94
   - Skew: -90 to 90
     - No skew data is currently output by any known program. These are safe values though.
+  - The tables are generated at 0.1 steps increments to help with rounding and best accuracy. 
   - lg_*.csv if for LG models and sm_*.csv is for SM models. This matters do not misname custom atos tables.
 
 #### Limitations
