@@ -29,4 +29,4 @@ Multiple layers of safeguards have been implemented, even at the cost of some VE
   - Azimuth: 5 to 445
   - Elevation: -5 to 94
   - Skew: -90 to 90
-    - No skew data is currently output by any known program. these are safe values though.
+    - No skew data is currently output by any known program. These are safe values though.
